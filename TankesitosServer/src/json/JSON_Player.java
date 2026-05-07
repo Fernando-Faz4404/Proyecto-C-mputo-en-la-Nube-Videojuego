@@ -9,5 +9,5 @@ public class JSON_Player {
     public int posX;
     public int posY;
 //    public String playerName;
-    public String direction;
+    public String direccion;
 }
