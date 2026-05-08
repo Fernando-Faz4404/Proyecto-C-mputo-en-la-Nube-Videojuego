@@ -6,17 +6,16 @@ import client.entity.Team;
 import client.game.GamePanel;
 import com.google.gson.Gson;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.net.InetAddress;
 import java.net.Socket;
 
-/**
- * Multiplayer socket client. Uses DataOutputStream.writeUTF() /
- * DataInputStream.readUTF() with Gson JSON — same pattern as
- * the original Manda/Recibe classes.
- */
 public class NetworkClient {
 
     private final String serverIp;
@@ -25,8 +24,10 @@ public class NetworkClient {
     private final Gson gson = new Gson();
 
     private Socket socket;
-    private DataOutputStream dos;
-    private DataInputStream dis;
+    // private DataOutputStream dos;
+    // private DataInputStream dis;
+    private BufferedWriter bw;
+    private BufferedReader br;
     private volatile boolean connected;
 
     public NetworkClient(String serverIp, int serverPort, GamePanel gamePanel) {
@@ -39,8 +40,11 @@ public class NetworkClient {
         Thread t = new Thread(() -> {
             try {
                 socket = new Socket(InetAddress.getByName(serverIp), serverPort);
-                dos = new DataOutputStream(socket.getOutputStream());
-                dis = new DataInputStream(socket.getInputStream());
+//                dos = new DataOutputStream(socket.getOutputStream());
+//                dis = new DataInputStream(socket.getInputStream());
+                bw = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream())); 
+                br = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                
                 connected = true;
 
                 // Send JOIN message
@@ -64,7 +68,7 @@ public class NetworkClient {
     private void receiveLoop() {
         while (connected) {
             try {
-                GameMessage msg = gson.fromJson(dis.readUTF(), GameMessage.class);
+                GameMessage msg = gson.fromJson(br.readLine(), GameMessage.class);
                 handleMessage(msg);
             } catch (IOException e) {
                 System.out.println("Disconnected from server.");
@@ -108,8 +112,9 @@ public class NetworkClient {
     private synchronized void send(GameMessage msg) {
         if (!connected) return;
         try {
-            dos.writeUTF(gson.toJson(msg));
-            dos.flush();
+            bw.write(gson.toJson(msg));
+            bw.newLine();
+            bw.flush();
         } catch (IOException e) {
             System.out.println("Send error: " + e.getMessage());
             connected = false;
