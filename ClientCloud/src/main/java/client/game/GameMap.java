@@ -65,7 +65,8 @@ public class GameMap {
         int row = (int) (py / TILE_SIZE);
         if (col < 0 || col >= cols || row < 0 || row >= rows) return true;
         int tile = tiles[row][col];
-        return tile == 1 || tile == 2;
+        //return tile == 1 || tile == 2;
+        return tile == 1 || tile == 2 || tile == 4 || tile == 5 || tile == 6 || tile == 7;
     }
 
     public List<Rectangle2D> getWallsNear(double cx, double cy, double range) {

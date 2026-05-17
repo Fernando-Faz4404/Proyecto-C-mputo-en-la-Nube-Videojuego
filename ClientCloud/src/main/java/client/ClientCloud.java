@@ -11,11 +11,11 @@ import java.util.Map;
 
 public class ClientCloud {
 
-    static final String DEFAULT_MAP = "/maps/map01.txt";
+    static final String DEFAULT_MAP = "/maps/mapaHielo.txt";
 
     public static void main(String[] args) {
         Map<String, String> env = loadEnv();
-        String serverIp = env.getOrDefault("SERVER_IP", "10.103.162.37");
+        String serverIp = env.getOrDefault("SERVER_IP", "192.168.0.133");
         int serverPort = Integer.parseInt(env.getOrDefault("SERVER_PORT", "2555"));
 
         String playerName = args.length > 0 ? args[0] : "Player" + (int) (Math.random() * 1000);

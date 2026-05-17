@@ -49,6 +49,11 @@ public class AssetLoader {
         tileImages.put(1, loadImage("/tiles/wall.png", 48, 48, new Color(100, 85, 70)));
         tileImages.put(2, loadImage("/tiles/water.png", 48, 48, new Color(50, 100, 180)));
         tileImages.put(3, loadImage("/tiles/sand.png", 48, 48, new Color(194, 178, 128)));
+        tileImages.put(4, loadImage("/tiles/lava.png", 48, 48, new Color(255, 80, 0)));
+        tileImages.put(5, loadImage("/tiles/rocaVolcanica.png", 48, 48, new Color(60, 60, 60)));
+        tileImages.put(6, loadImage("/tiles/aguaHielo.png", 48, 48, new Color(180, 240, 255)));
+        tileImages.put(7, loadImage("/tiles/muroHielo.png", 48, 48, new Color(180, 220, 255)));
+        tileImages.put(8, loadImage("/tiles/sueloHielo.png", 48, 48, new Color(220, 240, 255)));
 
         // Tank sprites
         tankRed  = loadImage("/sprites/tank_red.png",  36, 40, new Color(200, 50, 50));
