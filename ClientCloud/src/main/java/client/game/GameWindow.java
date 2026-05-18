@@ -60,6 +60,7 @@ public class GameWindow extends JFrame implements NetworkClient.EventListener {
         setSize(VIEWPORT_W, VIEWPORT_H);
         setLocationRelativeTo(null);
 
+        gamePanel.setOnReturnToMenu(this::showMainMenu);
         gamePanel.startGame();
         gamePanel.requestFocusInWindow();
     }
@@ -112,6 +113,11 @@ public class GameWindow extends JFrame implements NetworkClient.EventListener {
         setSize(VIEWPORT_W, VIEWPORT_H);
         setLocationRelativeTo(null);
 
+        gamePanel.setOnReturnToMenu(() -> {
+            net.disconnect();
+            net = null;
+            showMainMenu();
+        });
         gamePanel.startGame();
         gamePanel.requestFocusInWindow();
     }

@@ -22,7 +22,7 @@ public class GamePanel extends JPanel implements Runnable {
     public static final int VIEW_H = 720;
 
     private static final int FPS           = 60;
-    private static final int POWERUP_COUNT = 14;
+    private static final int POWERUP_COUNT = 8;
     private static final int TOTAL_ROUNDS  = 3;
 
     private static final String[] ROUND_MAPS = {
@@ -58,12 +58,18 @@ public class GamePanel extends JPanel implements Runnable {
     private final NetworkClient net;
     private final boolean testMode;
 
+    private Runnable onReturnToMenu = null;
+
     private long speedUntil    = 0;
     private long immunityUntil = 0;
     private long ammoUntil     = 0;
 
     // Used to fire N-key round advance only once per press
     private boolean lastNextRound = false;
+
+    public void setOnReturnToMenu(Runnable callback) {
+        this.onReturnToMenu = callback;
+    }
 
     public GamePanel(String playerName, Team team, String mapResource,
                      int teamCount, long seed, NetworkClient net) {
@@ -147,6 +153,12 @@ public class GamePanel extends JPanel implements Runnable {
         lastNextRound = keyHandler.nextRound;
 
         if (roundOver) {
+            // ENTER returns to main menu after the full match ends
+            if (gameOver && keyHandler.menu && onReturnToMenu != null) {
+                gameThread = null;
+                SwingUtilities.invokeLater(onReturnToMenu);
+                return;
+            }
             if (testMode && nPressed && !gameOver) {
                 int next = currentRound + 1;
                 if (next <= TOTAL_ROUNDS) {
@@ -357,7 +369,7 @@ public class GamePanel extends JPanel implements Runnable {
         fm = g2.getFontMetrics();
         String hint;
         if (gameOver) {
-            hint = "Partida terminada";
+            hint = "[ ENTER ] = Volver al menú";
         } else if (testMode) {
             hint = "[ N ] = Continuar a la siguiente ronda";
         } else {

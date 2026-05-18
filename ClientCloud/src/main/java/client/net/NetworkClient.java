@@ -175,6 +175,11 @@ public class NetworkClient {
     public boolean isConnected() { return connected; }
     public String getPlayerId()  { return pendingPlayerId; }
 
+    public synchronized void disconnect() {
+        connected = false;
+        try { if (socket != null) socket.close(); } catch (IOException ignored) {}
+    }
+
     private InetAddress findLocalAddressForServer(String remoteIp) {
         try {
             byte[] remote = InetAddress.getByName(remoteIp).getAddress();
