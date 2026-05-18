@@ -30,27 +30,27 @@ public class HUD {
         drawControls(g2, viewW, viewH);
     }
 
-    // ---- Top bar: RONDA X/Y | TEAM ●●○ kills | ... ----
+    // ---- Top bar: RONDA X/Y ----
 
     private void drawTopBar(Graphics2D g2,
                             int rKills, int bKills, int gKills, int yKills,
-                            int rWins, int bWins, int gWins, int yWins,
+                            int rWins,  int bWins,  int gWins,  int yWins,
                             int teamCount, int currentRound, int totalRounds, int viewW) {
 
-        Team[] teams = { Team.RED, Team.BLUE, Team.GREEN, Team.YELLOW };
+        Team[] teams = { Team.RED,  Team.BLUE,  Team.GREEN,  Team.YELLOW };
         int[] kills = { rKills, bKills, gKills, yKills };
-        int[] wins = { rWins, bWins, gWins, yWins };
+        int[] wins = { rWins,  bWins,  gWins,  yWins  };
 
         // ── measure widths ──────────────────────────────────────────────────
         g2.setFont(FONT_LARGE);
         FontMetrics fm = g2.getFontMetrics();
 
         // Round label
-        String mapLabel = currentRound >= 1 && currentRound <= MAP_NAMES.length
+        String mapLabel  = currentRound >= 1 && currentRound <= MAP_NAMES.length
                            ? MAP_NAMES[currentRound - 1] : "";
         String roundText = "RONDA " + currentRound + "/" + totalRounds;
         int roundW = fm.stringWidth(roundText);
-        int mapW = 0;
+        int mapW   = 0;
         if (!mapLabel.isEmpty()) {
             g2.setFont(FONT_SMALL);
             mapW = g2.getFontMetrics().stringWidth(mapLabel);
@@ -60,11 +60,11 @@ public class HUD {
 
         // Team segments
         int dotSize = 10, dotGap = 4;
-        int dotsW = totalRounds * (dotSize + dotGap) - dotGap;
-        int segPad = 16;
+        int dotsW   = totalRounds * (dotSize + dotGap) - dotGap;
+        int segPad  = 16;
         int[] segWidths = new int[teamCount];
         for (int i = 0; i < teamCount; i++) {
-            String label = teams[i].name() + " " + kills[i];
+            String label = teams[i].name() + "  " + kills[i];
             segWidths[i] = segPad + dotsW + 8 + fm.stringWidth(label) + segPad;
         }
         int totalTeamW = 0;
@@ -111,7 +111,7 @@ public class HUD {
 
         for (int i = 0; i < teamCount; i++) {
             Color tc = teams[i].bodyColor;
-            int midY = barY + barH / 2;
+            int midY  = barY + barH / 2;
 
             // Dot indicators (round wins)
             int dotStartX = sx + segPad;
@@ -134,7 +134,7 @@ public class HUD {
             }
 
             // Kill count
-            String killStr = teams[i].name() + " " + kills[i];
+            String killStr = teams[i].name() + "  " + kills[i];
             int textX = dotStartX + dotsW + 8;
             // shadow
             g2.setColor(new Color(0, 0, 0, 150));
@@ -158,15 +158,15 @@ public class HUD {
     private void drawLocalInfo(Graphics2D g2, Tank localTank, int viewH) {
         if (localTank == null) return;
         g2.setFont(FONT_SMALL);
-        int y = viewH - 80; // raised so both lines are fully inside the viewport
+        int y = viewH - 80;   // raised so both lines are fully inside the viewport
         g2.setColor(new Color(0, 0, 0, 170));
         g2.fillRoundRect(8, y - 6, 260, 50, 6, 6);
         g2.setColor(localTank.getTeam().turretColor);
-        g2.drawString("▶ " + localTank.getTeam().displayName
+        g2.drawString("▶  " + localTank.getTeam().displayName
                 + " | " + localTank.getPlayerId(), 16, y + 12);
         g2.setColor(new Color(210, 210, 210));
         g2.drawString("HP: " + localTank.getHealth() + "/" + Tank.MAX_HEALTH
-                + " Kills: " + localTank.getScore(), 16, y + 30);
+                + "   Kills: " + localTank.getScore(), 16, y + 30);
     }
 
     // ── Bottom-right: controls hint ──────────────────────────────────────────
@@ -174,7 +174,7 @@ public class HUD {
     private void drawControls(Graphics2D g2, int viewW, int viewH) {
         g2.setFont(FONT_SMALL);
         g2.setColor(new Color(180, 180, 180, 140));
-        g2.drawString("WASD=Mover SPACE=Disparar R=Reaparecer", viewW - 360, viewH - 16);
+        g2.drawString("WASD=Mover  SPACE=Disparar  R=Reaparecer", viewW - 360, viewH - 16);
     }
 
     // ── Right side: active power-up bars ────────────────────────────────────
@@ -182,8 +182,8 @@ public class HUD {
     private void drawActiveEffects(Graphics2D g2, long speedUntil, long immunityUntil,
                                    long ammoUntil, int viewW, int viewH) {
         long now = System.currentTimeMillis();
-        PowerUp.Type[] types = { PowerUp.Type.SPEED, PowerUp.Type.IMMUNITY, PowerUp.Type.AMMO };
-        long[] untils = { speedUntil, immunityUntil, ammoUntil };
+        PowerUp.Type[] types  = { PowerUp.Type.SPEED, PowerUp.Type.IMMUNITY, PowerUp.Type.AMMO };
+        long[]         untils = { speedUntil, immunityUntil, ammoUntil };
 
         int x = viewW - 148;
         int y = viewH - 86;
@@ -191,7 +191,7 @@ public class HUD {
         for (int i = 0; i < types.length; i++) {
             long remaining = untils[i] - now;
             if (remaining <= 0) continue;
-            Color c = types[i].color();
+            Color c    = types[i].color();
             float secs = remaining / 1000f;
 
             g2.setColor(new Color(0, 0, 0, 160));
@@ -201,14 +201,14 @@ public class HUD {
             g2.fillRoundRect(x, y - 11, barW, 12, 3, 3);
             g2.setColor(Color.WHITE);
             g2.setFont(FONT_SMALL);
-            g2.drawString(types[i].label() + " " + String.format("%.1fs", secs), x + 2, y);
+            g2.drawString(types[i].label() + "  " + String.format("%.1fs", secs), x + 2, y);
             y -= 22;
         }
     }
 
     private float maxDuration(PowerUp.Type type) {
         return switch (type) {
-            case SPEED -> 5f;
+            case SPEED  -> 5f;
             case IMMUNITY -> 4f;
             case AMMO -> 8f;
             default -> 5f;
