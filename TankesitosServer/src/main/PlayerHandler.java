@@ -1,185 +1,269 @@
 package main;
 
-import java.net.Socket;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicInteger;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import json.JSON_GameMessage;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
+
 public class PlayerHandler implements Runnable {
-    public static CopyOnWriteArrayList<PlayerHandler> playerHandlers = new CopyOnWriteArrayList<>();
 
-    private static AtomicInteger numPlayers = new AtomicInteger(1);
-    private static AtomicInteger redScore   = new AtomicInteger(0);
-    private static AtomicInteger blueScore  = new AtomicInteger(0);
+    public static final CopyOnWriteArrayList<PlayerHandler> playerHandlers = new CopyOnWriteArrayList<>();
+    public static final GameLobby lobby = new GameLobby();
 
-    private Socket socket;
+    private static final AtomicInteger numPlayers  = new AtomicInteger(1);
+    private static final AtomicInteger redScore    = new AtomicInteger(0);
+    private static final AtomicInteger blueScore   = new AtomicInteger(0);
+    private static final AtomicInteger greenScore  = new AtomicInteger(0);
+    private static final AtomicInteger yellowScore = new AtomicInteger(0);
+    private static volatile long gameSeed = 0;
+
+    private final int     internalId;
+    private final Gson    gson = new Gson();
+    private java.net.Socket socket;
     private DataOutputStream dos;
     private DataInputStream  dis;
 
-    private int    playerID;
-    private String playerId;   // ID string recibido del cliente en JOIN
-    private String team;
-    private double posX;
-    private double posY;
-    private double angle;
-    private int    health = 100;
-    private boolean alive = true;
+    private String  playerId;
+    private String  team;
+    private double  posX, posY, angle;
+    private int     health = 100;
+    private boolean alive  = true;
 
-    // Se crea una vez para calcular el tileSize de posición inicial
-    private static final GamePanel gp = new GamePanel();
-
-    private Gson gson = new Gson();
-
-    public PlayerHandler(Socket socket) {
+    public PlayerHandler(java.net.Socket socket) {
+        this.socket     = socket;
+        this.internalId = numPlayers.getAndIncrement();
         try {
-            this.socket = socket;
-            this.dos    = new DataOutputStream(socket.getOutputStream());
-            this.dis    = new DataInputStream(socket.getInputStream());
-            this.playerID = PlayerHandler.numPlayers.getAndIncrement();
+            this.dos = new DataOutputStream(socket.getOutputStream());
+            this.dis = new DataInputStream(socket.getInputStream());
 
-            // Recibe el mensaje JOIN del cliente (DataInputStream.readUTF)
+            // Read JOIN message
             String joinJson = dis.readUTF();
-            JsonObject joinObj = JsonParser.parseString(joinJson).getAsJsonObject();
-            this.playerId = joinObj.has("playerId") ? joinObj.get("playerId").getAsString()
-                                                    : "Player" + this.playerID;
-            this.team     = joinObj.has("team")     ? joinObj.get("team").getAsString() : "BLUE";
+            JsonObject jo   = JsonParser.parseString(joinJson).getAsJsonObject();
+            this.playerId   = jo.has("playerId") ? jo.get("playerId").getAsString()
+                                                 : "Player" + internalId;
+            int prefTeams   = jo.has("teamCount") ? jo.get("teamCount").getAsInt() : 2;
 
-            // Posición inicial según equipo (coordenadas del mapa del cliente: 25x16 tiles, tileSize=48)
-            this.posX = "RED".equals(this.team) ? gp.getTileSize() * 3 : gp.getTileSize() * 21;
-            this.posY = gp.getTileSize() * 8;
+            String assignedTeam = lobby.addPlayer(playerId, prefTeams);
+            if (assignedTeam == null) {
+                // Lobby full — reject
+                writeUTF("{\"type\":\"DISCONNECT\",\"playerId\":\"" + playerId + "\"}");
+                closeQuietly();
+                return;
+            }
+            this.team = assignedTeam;
 
-            PlayerHandler.playerHandlers.add(this);
-            System.out.println("Se ha unido: " + this.playerId + " [" + this.team + "]");
+            playerHandlers.add(this);
+            System.out.println("[Lobby] " + playerId + " joined as " + team
+                    + " (" + lobby.getCurrentPlayers() + "/" + lobby.getMaxPlayers() + ")");
 
-            // Manda el estado de jugadores ya conectados al nuevo jugador
-            sendExistingPlayers();
+            // Send current lobby state to the new player
+            sendTo(this, gson.toJson(buildLobbyState()));
 
-            // Notifica a los demás del nuevo jugador
-            notifyNewPlayer();
+            // Notify others of updated lobby
+            broadcastAll(gson.toJson(buildLobbyState()));
+
+            // Auto-start when minimum players are met
+            if (lobby.isReadyToStart()) {
+                launchGame();
+            }
 
         } catch (IOException e) {
-            closeConnection(socket, dis, dos);
+            closeQuietly();
         }
     }
 
     @Override
     public void run() {
-        while (socket.isConnected()) {
+        while (socket != null && socket.isConnected()) {
             try {
-                String messageFromPlayer = dis.readUTF();
-                if (messageFromPlayer != null) {
-                    handlerClientMessages(messageFromPlayer);
-                }
+                String msg = dis.readUTF();
+                if (msg != null) handleMessage(msg);
             } catch (IOException e) {
-                closeConnection(socket, dis, dos);
                 break;
             }
         }
+        disconnect();
     }
 
-    public void broadcastMessage(String message) {
-        for (PlayerHandler playerHandler : PlayerHandler.playerHandlers) {
-            if (playerHandler.playerID != this.playerID) {
-                sendMessagePlayer(playerHandler, message);
-            }
-        }
-    }
+    // ---- Message handling ----
 
-    public void sendMessagePlayer(PlayerHandler playerHandler, String message) {
+    private void handleMessage(String json) {
         try {
-            playerHandler.dos.writeUTF(message);
-            playerHandler.dos.flush();
-        } catch (IOException e) {
-            closeConnection(playerHandler.socket, playerHandler.dis, playerHandler.dos);
-        }
-    }
+            JsonObject jo   = JsonParser.parseString(json).getAsJsonObject();
+            String     type = jo.get("type").getAsString();
 
-    public void notifyNewPlayer() {
-        // Envía el estado de este jugador a todos los demás (STATE_UPDATE)
-        JSON_GameMessage msg = JSON_GameMessage.stateUpdate(
-                this.playerId, this.team, this.posX, this.posY, this.angle, this.health, this.alive);
-        broadcastMessage(gson.toJson(msg));
-    }
-
-    public void sendExistingPlayers() {
-        // Envía el estado de cada jugador existente al recién conectado
-        for (PlayerHandler other : PlayerHandler.playerHandlers) {
-            if (other.playerID != this.playerID) {
-                JSON_GameMessage msg = JSON_GameMessage.stateUpdate(
-                        other.playerId, other.team, other.posX, other.posY,
-                        other.angle, other.health, other.alive);
-                sendMessagePlayer(this, gson.toJson(msg));
+            switch (type) {
+                case "MOVE" -> {
+                    JSON_GameMessage d = gson.fromJson(json, JSON_GameMessage.class);
+                    if (d.x      != null) posX   = d.x;
+                    if (d.y      != null) posY   = d.y;
+                    if (d.angle  != null) angle  = d.angle;
+                    if (d.health != null) health = d.health;
+                    if (d.alive  != null) alive  = d.alive;
+                    broadcastOthers(json);
+                }
+                case "SHOOT"  -> broadcastOthers(json);
+                case "DEATH"  -> {
+                    alive  = false;
+                    health = 0;
+                    incrementOpponentScore();
+                    broadcastOthers(json);
+                    checkRoundEnd();
+                }
+                case "POWERUP_COLLECTED" -> broadcastOthers(json);
+                default -> {}
             }
+        } catch (Exception e) {
+            System.err.println("handleMessage error: " + e.getMessage());
         }
     }
 
-    public void closeConnection(Socket socket, DataInputStream dis, DataOutputStream dos) {
+    private static synchronized void checkRoundEnd() {
+        if (lobby.getState() != GameLobby.State.IN_GAME) return;
+
+        // Build a map of team → hasAlivePlayer for all active teams
+        String[] allTeams = { "RED", "BLUE", "GREEN", "YELLOW" };
+        Map<String, Boolean> teamAlive = new LinkedHashMap<>();
+        for (int i = 0; i < lobby.getTeamCount(); i++) teamAlive.put(allTeams[i], false);
+        for (PlayerHandler ph : playerHandlers) {
+            if (teamAlive.containsKey(ph.team) && ph.alive)
+                teamAlive.put(ph.team, true);
+        }
+
+        List<String> survivors = teamAlive.entrySet().stream()
+                .filter(Map.Entry::getValue)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
+
+        if (survivors.size() > 1) return; // round still ongoing
+
+        String winner = survivors.isEmpty() ? "DRAW" : survivors.get(0);
+        boolean moreRounds = lobby.advanceRound(winner);
+        int[]   wins       = lobby.getRoundWins();
+        int     doneRound  = lobby.getCurrentRound() - 1;
+
+        String endJson = new Gson().toJson(JSON_GameMessage.roundEnd(
+                doneRound, GameLobby.TOTAL_ROUNDS, winner,
+                wins[0], wins[1], wins[2], wins[3]));
+        broadcastAll(endJson);
+        System.out.println("[Server] Round " + doneRound + " ended. Winner: " + winner);
+
+        if (moreRounds) {
+            // Reset alive/health for next round
+            for (PlayerHandler ph : playerHandlers) { ph.alive = true; ph.health = 100; }
+            redScore.set(0); blueScore.set(0); greenScore.set(0); yellowScore.set(0);
+
+            final long   newSeed   = System.currentTimeMillis();
+            final int    nextRound = lobby.getCurrentRound();
+            final String nextMap   = lobby.getCurrentMapResource();
+            final int[]  finalWins = wins;
+
+            new Thread(() -> {
+                try { Thread.sleep(5000); } catch (InterruptedException ignored) {}
+                String startJson = new Gson().toJson(JSON_GameMessage.roundStart(
+                        nextRound, GameLobby.TOTAL_ROUNDS, nextMap, newSeed,
+                        finalWins[0], finalWins[1], finalWins[2], finalWins[3]));
+                broadcastAll(startJson);
+                System.out.println("[Server] Round " + nextRound + " started. Map: " + nextMap);
+            }, "RoundDelay-" + nextRound).start();
+        } else {
+            System.out.println("[Server] Game over. Round wins — RED:" + wins[0]
+                    + " BLUE:" + wins[1] + " GREEN:" + wins[2] + " YELLOW:" + wins[3]);
+        }
+    }
+
+    private void incrementOpponentScore() {
+        int r = redScore.get(), b = blueScore.get(),
+            g = greenScore.get(), y = yellowScore.get();
+        switch (team) {
+            case "RED"    -> b = blueScore.incrementAndGet();
+            case "BLUE"   -> r = redScore.incrementAndGet();
+            case "GREEN"  -> y = yellowScore.incrementAndGet();
+            case "YELLOW" -> g = greenScore.incrementAndGet();
+        }
+        String scoreJson = gson.toJson(
+                JSON_GameMessage.scoreUpdate(r, b, g, y));
+        broadcastAll(scoreJson);
+    }
+
+    // ---- Lobby helpers ----
+
+    private static synchronized void launchGame() {
+        if (lobby.getState() == GameLobby.State.IN_GAME) return;
+        lobby.startGame();
+        gameSeed = System.currentTimeMillis();
+
+        List<JSON_GameMessage.LobbyPlayer> lp = lobby.getEntries().stream()
+                .map(e -> new JSON_GameMessage.LobbyPlayer(e.playerId, e.team))
+                .collect(Collectors.toList());
+
+        String startJson = new Gson().toJson(
+                JSON_GameMessage.gameStart(lobby.getTeamCount(),
+                        lobby.getMapResource(), gameSeed, lp));
+        broadcastAll(startJson);
+        System.out.println("[Server] Game started! seed=" + gameSeed);
+    }
+
+    private static JSON_GameMessage buildLobbyState() {
+        List<JSON_GameMessage.LobbyPlayer> lp = lobby.getEntries().stream()
+                .map(e -> new JSON_GameMessage.LobbyPlayer(e.playerId, e.team))
+                .collect(Collectors.toList());
+        String status = lobby.isReadyToStart() ? "STARTING" : "WAITING";
+        return JSON_GameMessage.lobbyState(lobby.getTeamCount(), status,
+                lobby.getMinPlayers(), lp);
+    }
+
+    // ---- Network helpers ----
+
+    private static void broadcastAll(String msg) {
+        for (PlayerHandler ph : playerHandlers) sendTo(ph, msg);
+    }
+
+    private void broadcastOthers(String msg) {
+        for (PlayerHandler ph : playerHandlers) {
+            if (ph.internalId != this.internalId) sendTo(ph, msg);
+        }
+    }
+
+    private static void sendTo(PlayerHandler ph, String msg) {
+        try {
+            ph.dos.writeUTF(msg);
+            ph.dos.flush();
+        } catch (IOException e) {
+            ph.disconnect();
+        }
+    }
+
+    private void writeUTF(String msg) throws IOException {
+        dos.writeUTF(msg);
+        dos.flush();
+    }
+
+    private void disconnect() {
         playerHandlers.remove(this);
+        lobby.removePlayer(playerId);
+        System.out.println("[Lobby] " + playerId + " disconnected.");
 
-        // Notifica a los demás la desconexión
-        if (this.playerId != null) {
-            System.out.println("Se ha desconectado: " + this.playerId);
-            String disconnectJson = gson.toJson(JSON_GameMessage.disconnect(this.playerId));
-            for (PlayerHandler playerHandler : PlayerHandler.playerHandlers) {
-                sendMessagePlayer(playerHandler, disconnectJson);
-            }
+        if (playerId != null) {
+            broadcastAll(gson.toJson(JSON_GameMessage.disconnect(playerId)));
+            broadcastAll(gson.toJson(buildLobbyState()));
         }
-
-        try {
-            if (socket != null) socket.close();
-            if (dis    != null) dis.close();
-            if (dos    != null) dos.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        closeQuietly();
     }
 
-    public void handlerClientMessages(String json) {
-        JsonObject jsonObject = JsonParser.parseString(json).getAsJsonObject();
-        String type = jsonObject.get("type").getAsString();
-
-        switch (type) {
-            case "MOVE": {
-                // Actualiza el estado almacenado y reenvía a los demás
-                JSON_GameMessage data = gson.fromJson(json, JSON_GameMessage.class);
-                if (data.x      != null) this.posX   = data.x;
-                if (data.y      != null) this.posY   = data.y;
-                if (data.angle  != null) this.angle  = data.angle;
-                if (data.health != null) this.health = data.health;
-                if (data.alive  != null) this.alive  = data.alive;
-                broadcastMessage(json);
-                break;
-            }
-            case "SHOOT": {
-                broadcastMessage(json);
-                break;
-            }
-            case "DEATH": {
-                this.alive  = false;
-                this.health = 0;
-                // El equipo contrario suma un punto
-                int red  = redScore.get();
-                int blue = blueScore.get();
-                if ("RED".equals(this.team)) {
-                    blue = blueScore.incrementAndGet();
-                } else {
-                    red  = redScore.incrementAndGet();
-                }
-                String scoreJson = gson.toJson(JSON_GameMessage.scoreUpdate(red, blue));
-                for (PlayerHandler ph : PlayerHandler.playerHandlers) {
-                    sendMessagePlayer(ph, scoreJson);
-                }
-                broadcastMessage(json);
-                break;
-            }
-            default:
-                break;
-        }
+    private void closeQuietly() {
+        try { if (socket != null) socket.close(); } catch (IOException ignored) {}
+        try { if (dis    != null) dis.close();    } catch (IOException ignored) {}
+        try { if (dos    != null) dos.close();    } catch (IOException ignored) {}
     }
 }

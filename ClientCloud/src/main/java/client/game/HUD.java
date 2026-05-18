@@ -4,87 +4,204 @@ import client.entity.PowerUp;
 import client.entity.Tank;
 import client.entity.Team;
 
-import java.awt.Color;
-import java.awt.Font;
-import java.awt.Graphics2D;
+import java.awt.*;
 import java.util.Map;
 
 public class HUD {
 
-    private static final Font FONT_LARGE = new Font("Monospaced", Font.BOLD, 18);
-    private static final Font FONT_SMALL = new Font("Monospaced", Font.PLAIN, 14);
+    private static final Font FONT_LARGE = new Font("Monospaced", Font.BOLD, 16);
+    private static final Font FONT_SMALL = new Font("Monospaced", Font.PLAIN, 13);
     private static final Font FONT_TITLE = new Font("Monospaced", Font.BOLD, 48);
 
+    private static final String[] MAP_NAMES = { "Gran Batalla", "Volcánico", "Ártico" };
+
     public void draw(Graphics2D g2, Tank localTank, Map<String, Tank> allTanks,
-                     int redScore, int blueScore, int mapWidth, int mapHeight,
+                     int redScore, int blueScore, int greenScore, int yellowScore,
+                     int redWins, int blueWins, int greenWins, int yellowWins,
+                     int teamCount, int currentRound, int totalRounds,
+                     int viewW, int viewH,
                      long speedUntil, long immunityUntil, long ammoUntil) {
-        // Team scores top center
-        g2.setFont(FONT_LARGE);
-        String scoreText = "RED " + redScore + " - " + blueScore + " BLUE";
-        int tw = g2.getFontMetrics().stringWidth(scoreText);
-        int cx = mapWidth / 2 - tw / 2;
-        g2.setColor(new Color(0, 0, 0, 150));
-        g2.fillRoundRect(cx - 10, 5, tw + 20, 28, 8, 8);
-        g2.setColor(Team.RED.bodyColor);
-        String redPart = "RED " + redScore;
-        g2.drawString(redPart, cx, 25);
-        g2.setColor(Color.WHITE);
-        int redW = g2.getFontMetrics().stringWidth(redPart);
-        g2.drawString(" - ", cx + redW, 25);
-        g2.setColor(Team.BLUE.bodyColor);
-        int midW = g2.getFontMetrics().stringWidth(" - ");
-        g2.drawString(blueScore + " BLUE", cx + redW + midW, 25);
 
-        // Local player info bottom-left
-        if (localTank != null) {
-            g2.setFont(FONT_SMALL);
-            int y = mapHeight - 50;
-            g2.setColor(new Color(0, 0, 0, 150));
-            g2.fillRoundRect(8, y - 2, 200, 42, 8, 8);
-            g2.setColor(localTank.getTeam().turretColor);
-            g2.drawString(localTank.getTeam().displayName + " | " + localTank.getPlayerId(), 15, y + 14);
-            g2.drawString("HP: " + localTank.getHealth() + "/" + Tank.MAX_HEALTH
-                    + "  Kills: " + localTank.getScore(), 15, y + 32);
-        }
-
-        // Active power-up effects (bottom-right, above controls)
-        drawActiveEffects(g2, speedUntil, immunityUntil, ammoUntil, mapWidth, mapHeight);
-
-        // Controls hint bottom-right
-        g2.setFont(FONT_SMALL);
-        g2.setColor(new Color(200, 200, 200, 150));
-        g2.drawString("WASD=Move SPACE=Shoot R=Respawn", mapWidth - 320, mapHeight - 12);
+        drawTopBar(g2, redScore, blueScore, greenScore, yellowScore,
+                   redWins, blueWins, greenWins, yellowWins,
+                   teamCount, currentRound, totalRounds, viewW);
+        drawLocalInfo(g2, localTank, viewH);
+        drawActiveEffects(g2, speedUntil, immunityUntil, ammoUntil, viewW, viewH);
+        drawControls(g2, viewW, viewH);
     }
 
-    private void drawActiveEffects(Graphics2D g2, long speedUntil, long immunityUntil,
-                                   long ammoUntil, int mapWidth, int mapHeight) {
-        long now = System.currentTimeMillis();
-        PowerUp.Type[] types = { PowerUp.Type.SPEED, PowerUp.Type.IMMUNITY, PowerUp.Type.AMMO };
-        long[] untils = { speedUntil, immunityUntil, ammoUntil };
+    // ---- Top bar: RONDA X/Y  |  TEAM ●●○ kills  | ... ----
 
-        int x = mapWidth - 140;
-        int y = mapHeight - 80;
+    private void drawTopBar(Graphics2D g2,
+                            int rKills, int bKills, int gKills, int yKills,
+                            int rWins,  int bWins,  int gWins,  int yWins,
+                            int teamCount, int currentRound, int totalRounds, int viewW) {
+
+        Team[]   teams  = { Team.RED,  Team.BLUE,  Team.GREEN,  Team.YELLOW };
+        int[]    kills  = { rKills, bKills, gKills, yKills };
+        int[]    wins   = { rWins,  bWins,  gWins,  yWins  };
+
+        // ── measure widths ──────────────────────────────────────────────────
+        g2.setFont(FONT_LARGE);
+        FontMetrics fm = g2.getFontMetrics();
+
+        // Round label
+        String mapLabel  = currentRound >= 1 && currentRound <= MAP_NAMES.length
+                           ? MAP_NAMES[currentRound - 1] : "";
+        String roundText = "RONDA " + currentRound + "/" + totalRounds;
+        int roundW = fm.stringWidth(roundText);
+        int mapW   = 0;
+        if (!mapLabel.isEmpty()) {
+            g2.setFont(FONT_SMALL);
+            mapW = g2.getFontMetrics().stringWidth(mapLabel);
+            g2.setFont(FONT_LARGE);
+        }
+        int leftBlockW = Math.max(roundW, mapW) + 20;
+
+        // Team segments
+        int dotSize = 10, dotGap = 4;
+        int dotsW   = totalRounds * (dotSize + dotGap) - dotGap;
+        int segPad  = 16;
+        int[] segWidths = new int[teamCount];
+        for (int i = 0; i < teamCount; i++) {
+            String label = teams[i].name() + "  " + kills[i];
+            segWidths[i] = segPad + dotsW + 8 + fm.stringWidth(label) + segPad;
+        }
+        int totalTeamW = 0;
+        for (int w : segWidths) totalTeamW += w;
+
+        int totalBarW = leftBlockW + 12 + totalTeamW + 12;
+        int barH      = 38;
+        int barX      = viewW / 2 - totalBarW / 2;
+        int barY      = 6;
+
+        // ── background ──────────────────────────────────────────────────────
+        g2.setColor(new Color(0, 0, 0, 200));
+        g2.fillRoundRect(barX, barY, totalBarW, barH, 8, 8);
+        // subtle top highlight
+        g2.setColor(new Color(255, 255, 255, 18));
+        g2.fillRoundRect(barX, barY, totalBarW, 2, 8, 8);
+
+        // ── round block ─────────────────────────────────────────────────────
+        int cx = barX + leftBlockW / 2;
+        g2.setFont(FONT_LARGE);
+        fm = g2.getFontMetrics();
+        // shadow
+        g2.setColor(new Color(80, 60, 0));
+        g2.drawString(roundText, cx - fm.stringWidth(roundText) / 2 + 1, barY + 16 + 1);
+        // gold text
+        g2.setColor(new Color(255, 215, 20));
+        g2.drawString(roundText, cx - fm.stringWidth(roundText) / 2, barY + 16);
+
+        if (!mapLabel.isEmpty()) {
+            g2.setFont(FONT_SMALL);
+            FontMetrics sfm = g2.getFontMetrics();
+            g2.setColor(new Color(160, 160, 160));
+            g2.drawString(mapLabel, cx - sfm.stringWidth(mapLabel) / 2, barY + 30);
+        }
+
+        // divider after round block
+        g2.setColor(new Color(255, 255, 255, 40));
+        g2.fillRect(barX + leftBlockW + 4, barY + 6, 1, barH - 12);
+
+        // ── team segments ───────────────────────────────────────────────────
+        int sx = barX + leftBlockW + 12;
+        g2.setFont(FONT_LARGE);
+        fm = g2.getFontMetrics();
+
+        for (int i = 0; i < teamCount; i++) {
+            Color tc = teams[i].bodyColor;
+            int midY  = barY + barH / 2;
+
+            // Dot indicators (round wins)
+            int dotStartX = sx + segPad;
+            int dotY      = midY - dotSize / 2;
+            for (int d = 0; d < totalRounds; d++) {
+                int dx = dotStartX + d * (dotSize + dotGap);
+                if (d < wins[i]) {
+                    // filled = won
+                    g2.setColor(tc);
+                    g2.fillOval(dx, dotY, dotSize, dotSize);
+                    g2.setColor(new Color(255, 255, 255, 60));
+                    g2.fillOval(dx + 2, dotY + 1, 4, 3); // small shine
+                } else {
+                    // empty = not yet won
+                    g2.setColor(new Color(tc.getRed(), tc.getGreen(), tc.getBlue(), 60));
+                    g2.fillOval(dx, dotY, dotSize, dotSize);
+                    g2.setColor(new Color(tc.getRed(), tc.getGreen(), tc.getBlue(), 120));
+                    g2.drawOval(dx, dotY, dotSize - 1, dotSize - 1);
+                }
+            }
+
+            // Kill count
+            String killStr = teams[i].name() + "  " + kills[i];
+            int textX = dotStartX + dotsW + 8;
+            // shadow
+            g2.setColor(new Color(0, 0, 0, 150));
+            g2.drawString(killStr, textX + 1, midY + fm.getAscent() / 2 + 1);
+            // colored text
+            g2.setColor(tc);
+            g2.drawString(killStr, textX, midY + fm.getAscent() / 2);
+
+            sx += segWidths[i];
+
+            // divider between teams
+            if (i < teamCount - 1) {
+                g2.setColor(new Color(255, 255, 255, 30));
+                g2.fillRect(sx - 8, barY + 6, 1, barH - 12);
+            }
+        }
+    }
+
+    // ── Bottom-left: local player info ──────────────────────────────────────
+
+    private void drawLocalInfo(Graphics2D g2, Tank localTank, int viewH) {
+        if (localTank == null) return;
+        g2.setFont(FONT_SMALL);
+        int y = viewH - 80;   // raised so both lines are fully inside the viewport
+        g2.setColor(new Color(0, 0, 0, 170));
+        g2.fillRoundRect(8, y - 6, 260, 50, 6, 6);
+        g2.setColor(localTank.getTeam().turretColor);
+        g2.drawString("▶  " + localTank.getTeam().displayName
+                + " | " + localTank.getPlayerId(), 16, y + 12);
+        g2.setColor(new Color(210, 210, 210));
+        g2.drawString("HP: " + localTank.getHealth() + "/" + Tank.MAX_HEALTH
+                + "   Kills: " + localTank.getScore(), 16, y + 30);
+    }
+
+    // ── Bottom-right: controls hint ──────────────────────────────────────────
+
+    private void drawControls(Graphics2D g2, int viewW, int viewH) {
+        g2.setFont(FONT_SMALL);
+        g2.setColor(new Color(180, 180, 180, 140));
+        g2.drawString("WASD=Mover  SPACE=Disparar  R=Reaparecer", viewW - 360, viewH - 16);
+    }
+
+    // ── Right side: active power-up bars ────────────────────────────────────
+
+    private void drawActiveEffects(Graphics2D g2, long speedUntil, long immunityUntil,
+                                   long ammoUntil, int viewW, int viewH) {
+        long now = System.currentTimeMillis();
+        PowerUp.Type[] types  = { PowerUp.Type.SPEED, PowerUp.Type.IMMUNITY, PowerUp.Type.AMMO };
+        long[]         untils = { speedUntil, immunityUntil, ammoUntil };
+
+        int x = viewW - 148;
+        int y = viewH - 86;
 
         for (int i = 0; i < types.length; i++) {
             long remaining = untils[i] - now;
             if (remaining <= 0) continue;
-
-            Color c = types[i].color();
+            Color c    = types[i].color();
             float secs = remaining / 1000f;
 
-            g2.setColor(new Color(0, 0, 0, 150));
-            g2.fillRoundRect(x - 4, y - 14, 128, 18, 6, 6);
-
-            // Progress bar
-            g2.setColor(new Color(c.getRed(), c.getGreen(), c.getBlue(), 180));
-            int barW = (int) (120 * Math.min(1f, secs / maxDuration(types[i])));
-            g2.fillRoundRect(x, y - 11, barW, 12, 4, 4);
-
-            // Label + time
+            g2.setColor(new Color(0, 0, 0, 160));
+            g2.fillRoundRect(x - 4, y - 14, 134, 18, 5, 5);
+            int barW = (int) (124 * Math.min(1f, secs / maxDuration(types[i])));
+            g2.setColor(new Color(c.getRed(), c.getGreen(), c.getBlue(), 190));
+            g2.fillRoundRect(x, y - 11, barW, 12, 3, 3);
             g2.setColor(Color.WHITE);
             g2.setFont(FONT_SMALL);
-            g2.drawString(types[i].label() + " " + String.format("%.1fs", secs), x + 2, y);
-
+            g2.drawString(types[i].label() + "  " + String.format("%.1fs", secs), x + 2, y);
             y -= 22;
         }
     }
@@ -98,19 +215,20 @@ public class HUD {
         };
     }
 
-    public void drawDeathScreen(Graphics2D g2, int mapWidth, int mapHeight) {
+    // ── Death screen ─────────────────────────────────────────────────────────
+
+    public void drawDeathScreen(Graphics2D g2, int viewW, int viewH) {
         g2.setColor(new Color(0, 0, 0, 120));
-        g2.fillRect(0, 0, mapWidth, mapHeight);
+        g2.fillRect(0, 0, viewW, viewH);
         g2.setFont(FONT_TITLE);
         g2.setColor(Color.RED);
-        String msg = "DESTROYED";
+        String msg = "DESTRUIDO";
         int w = g2.getFontMetrics().stringWidth(msg);
-        g2.drawString(msg, mapWidth / 2 - w / 2, mapHeight / 2 - 10);
+        g2.drawString(msg, viewW / 2 - w / 2, viewH / 2 - 10);
         g2.setFont(FONT_LARGE);
         g2.setColor(Color.WHITE);
-        String sub = "Press R to respawn";
+        String sub = "Presiona R para reaparecer";
         int w2 = g2.getFontMetrics().stringWidth(sub);
-        g2.drawString(sub, mapWidth / 2 - w2 / 2, mapHeight / 2 + 30);
+        g2.drawString(sub, viewW / 2 - w2 / 2, viewH / 2 + 32);
     }
 }
-

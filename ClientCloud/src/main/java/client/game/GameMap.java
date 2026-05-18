@@ -60,13 +60,15 @@ public class GameMap {
         }
     }
 
+    private boolean isSolidTile(int t) {
+        return t == 1 || t == 2 || t == 4 || t == 5 || t == 6 || t == 7;
+    }
+
     public boolean isSolid(double px, double py) {
         int col = (int) (px / TILE_SIZE);
         int row = (int) (py / TILE_SIZE);
         if (col < 0 || col >= cols || row < 0 || row >= rows) return true;
-        int tile = tiles[row][col];
-        //return tile == 1 || tile == 2;
-        return tile == 1 || tile == 2 || tile == 4 || tile == 5 || tile == 6 || tile == 7;
+        return isSolidTile(tiles[row][col]);
     }
 
     public List<Rectangle2D> getWallsNear(double cx, double cy, double range) {
@@ -77,7 +79,7 @@ public class GameMap {
         int maxRow = Math.min(rows - 1, (int) ((cy + range) / TILE_SIZE));
         for (int r = minRow; r <= maxRow; r++) {
             for (int c = minCol; c <= maxCol; c++) {
-                if (tiles[r][c] == 1 || tiles[r][c] == 2) {
+                if (isSolidTile(tiles[r][c])) {
                     walls.add(new Rectangle2D.Double(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE));
                 }
             }

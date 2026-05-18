@@ -54,9 +54,7 @@ public class PowerUp {
     }
 
     public void update() {
-        if (collected && System.currentTimeMillis() - collectedAt >= RESPAWN_DELAY_MS) {
-            collected = false;
-        }
+        // Single-use: no respawn
     }
 
     public void draw(Graphics2D g2) {
@@ -65,24 +63,32 @@ public class PowerUp {
         Color c = type.color();
 
         if (collected) {
-            g2.setColor(new Color(c.getRed(), c.getGreen(), c.getBlue(), 40));
-            g2.fillRoundRect(ix, iy, SIZE, SIZE, 6, 6);
+            g2.setColor(new Color(c.getRed(), c.getGreen(), c.getBlue(), 30));
+            g2.fillRoundRect(ix - 2, iy - 2, SIZE + 4, SIZE + 4, 6, 6);
             return;
         }
 
         // Pulsing glow ring
         long t = System.currentTimeMillis();
-        int alpha = (int) (80 + 60 * Math.sin(t * 0.005));
+        int alpha = (int) (70 + 55 * Math.sin(t * 0.005));
         g2.setColor(new Color(c.getRed(), c.getGreen(), c.getBlue(), alpha));
         g2.fillOval(ix - 6, iy - 6, SIZE + 12, SIZE + 12);
 
-        // Box
-        g2.setColor(c);
-        g2.fillRoundRect(ix, iy, SIZE, SIZE, 6, 6);
-        g2.setColor(Color.WHITE);
-        g2.setFont(SYMBOL_FONT);
-        int sw = g2.getFontMetrics().stringWidth(type.symbol());
-        g2.drawString(type.symbol(), (int) (x - sw / 2.0), (int) (y + 5));
+        // Sprite icon if available, otherwise colored box fallback
+        java.awt.image.BufferedImage icon =
+                client.game.AssetLoader.get().getPowerUpImage(type.name());
+        if (icon != null) {
+            g2.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+                    java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+            g2.drawImage(icon, ix, iy, SIZE, SIZE, null);
+        } else {
+            g2.setColor(c);
+            g2.fillRoundRect(ix, iy, SIZE, SIZE, 6, 6);
+            g2.setColor(Color.WHITE);
+            g2.setFont(SYMBOL_FONT);
+            int sw = g2.getFontMetrics().stringWidth(type.symbol());
+            g2.drawString(type.symbol(), (int) (x - sw / 2.0), (int) (y + 5));
+        }
     }
 
     public void collect() {

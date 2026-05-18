@@ -5,7 +5,7 @@ import java.awt.event.KeyListener;
 
 public class KeyHandler implements KeyListener {
 
-    public boolean up, down, left, right, shoot, respawn;
+    public boolean up, down, left, right, shoot, respawn, nextRound;
 
     @Override public void keyTyped(KeyEvent e) {}
 
@@ -18,6 +18,7 @@ public class KeyHandler implements KeyListener {
             case KeyEvent.VK_D     -> right = true;
             case KeyEvent.VK_SPACE -> shoot = true;
             case KeyEvent.VK_R     -> respawn = true;
+            case KeyEvent.VK_N     -> nextRound = true;
         }
     }
 
@@ -30,6 +31,7 @@ public class KeyHandler implements KeyListener {
             case KeyEvent.VK_D     -> right = false;
             case KeyEvent.VK_SPACE -> shoot = false;
             case KeyEvent.VK_R     -> respawn = false;
+            case KeyEvent.VK_N     -> nextRound = false;
         }
     }
 }
