@@ -26,6 +26,9 @@ public class PlayerHandler implements Runnable {
     private static final AtomicInteger greenScore = new AtomicInteger(0);
     private static final AtomicInteger yellowScore = new AtomicInteger(0);
     private static volatile long gameSeed = 0;
+    private static final int START_DELAY_SECONDS = 10;
+    private static volatile long startDeadlineMs = 0;
+    private static volatile Thread startCountdownThread;
 
     // Power-up respawn tracking (server is the authority)
     private static final java.util.Set<Integer> collectedThisBatch =
@@ -77,10 +80,8 @@ public class PlayerHandler implements Runnable {
             // Notify others of updated lobby
             broadcastAll(gson.toJson(buildLobbyState()));
 
-            // Auto-start when minimum players are met
-            if (lobby.isReadyToStart()) {
-                launchGame();
-            }
+            // Auto-start with delay when minimum per team is met
+            evaluateAutoStart();
 
         } catch (IOException e) {
             closeQuietly();
@@ -222,6 +223,7 @@ public class PlayerHandler implements Runnable {
 
     private static synchronized void launchGame() {
         if (lobby.getState() == GameLobby.State.IN_GAME) return;
+        cancelStartCountdownLocked();
         lobby.startGame();
         gameSeed = System.currentTimeMillis();
 
@@ -240,9 +242,83 @@ public class PlayerHandler implements Runnable {
         List<JSON_GameMessage.LobbyPlayer> lp = lobby.getEntries().stream()
                 .map(e -> new JSON_GameMessage.LobbyPlayer(e.playerId, e.team))
                 .collect(Collectors.toList());
-        String status = lobby.isReadyToStart() ? "STARTING" : "WAITING";
+        Integer countdown = getCountdownSeconds();
+        String status = countdown != null ? "STARTING" : "WAITING";
         return JSON_GameMessage.lobbyState(lobby.getTeamCount(), status,
-                lobby.getMinPlayers(), lp);
+                lobby.getMinPlayers(), countdown, lp);
+    }
+
+    private static Integer getCountdownSeconds() {
+        long deadline = startDeadlineMs;
+        if (deadline <= 0 || lobby.getState() == GameLobby.State.IN_GAME || !lobby.isReadyToStart()) {
+            return null;
+        }
+        long now = System.currentTimeMillis();
+        long remainingMs = Math.max(0, deadline - now);
+        return (int) ((remainingMs + 999) / 1000);
+    }
+
+    private static synchronized void evaluateAutoStart() {
+        if (lobby.getState() == GameLobby.State.IN_GAME) {
+            cancelStartCountdownLocked();
+            return;
+        }
+
+        if (!lobby.isReadyToStart()) {
+            cancelStartCountdownLocked();
+            broadcastAll(new Gson().toJson(buildLobbyState()));
+            return;
+        }
+
+        if (startDeadlineMs == 0) {
+            startDeadlineMs = System.currentTimeMillis() + (START_DELAY_SECONDS * 1000L);
+            startCountdownThread = new Thread(PlayerHandler::runStartCountdown, "LobbyStartCountdown");
+            startCountdownThread.setDaemon(true);
+            startCountdownThread.start();
+            System.out.println("[Lobby] Minimum reached. Starting in " + START_DELAY_SECONDS + "s...");
+        }
+
+        broadcastAll(new Gson().toJson(buildLobbyState()));
+    }
+
+    private static void runStartCountdown() {
+        while (true) {
+            synchronized (PlayerHandler.class) {
+                if (startDeadlineMs == 0 || lobby.getState() == GameLobby.State.IN_GAME || !lobby.isReadyToStart()) {
+                    startCountdownThread = null;
+                    return;
+                }
+                if (System.currentTimeMillis() >= startDeadlineMs) {
+                    break;
+                }
+            }
+
+            broadcastAll(new Gson().toJson(buildLobbyState()));
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException ignored) {
+                return;
+            }
+        }
+
+        synchronized (PlayerHandler.class) {
+            startCountdownThread = null;
+            if (startDeadlineMs == 0 || !lobby.isReadyToStart() || lobby.getState() == GameLobby.State.IN_GAME) {
+                return;
+            }
+            startDeadlineMs = 0;
+        }
+
+        launchGame();
+    }
+
+    private static void cancelStartCountdownLocked() {
+        startDeadlineMs = 0;
+        Thread t = startCountdownThread;
+        startCountdownThread = null;
+        if (t != null && t != Thread.currentThread()) {
+            t.interrupt();
+        }
     }
 
     // ---- Network helpers ----
@@ -278,7 +354,7 @@ public class PlayerHandler implements Runnable {
 
         if (playerId != null) {
             broadcastAll(gson.toJson(JSON_GameMessage.disconnect(playerId)));
-            broadcastAll(gson.toJson(buildLobbyState()));
+            evaluateAutoStart();
         }
         closeQuietly();
     }

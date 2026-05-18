@@ -16,6 +16,7 @@ public class JSON_GameMessage {
     public String status;
     public String mapResource;
     public Integer minPlayers;
+    public Integer countdownSeconds;
     public Long seed;
     public Integer powerUpIndex;
     public Integer powerUpRespawnBatch;
@@ -62,12 +63,14 @@ public class JSON_GameMessage {
     }
 
     public static JSON_GameMessage lobbyState(int teamCount, String status,
-                                              int minPlayers, List<LobbyPlayer> players) {
+                                              int minPlayers, Integer countdownSeconds,
+                                              List<LobbyPlayer> players) {
         JSON_GameMessage m = new JSON_GameMessage();
         m.type = "LOBBY_STATE";
         m.teamCount = teamCount;
         m.status = status;
         m.minPlayers = minPlayers;
+        m.countdownSeconds = countdownSeconds;
         m.players = players;
         return m;
     }

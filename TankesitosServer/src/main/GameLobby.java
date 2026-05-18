@@ -21,6 +21,7 @@ public class GameLobby {
 
     private State state = State.WAITING;
     private int teamCount = 2;
+    private int nextTeamIndex = 0;
     private int currentRound = 0; // 0 = not started; 1..TOTAL_ROUNDS during game
     private final int[] roundWins = new int[4]; // 0=RED,1=BLUE,2=GREEN,3=YELLOW
 
@@ -35,8 +36,10 @@ public class GameLobby {
     /** Returns assigned team, or null if lobby is full or game already started. */
     public synchronized String addPlayer(String playerId, int preferredTeamCount) {
         if (state == State.IN_GAME) return null;
-        if (entries.isEmpty())
+        if (entries.isEmpty()) {
             teamCount = Math.max(2, Math.min(4, preferredTeamCount));
+            nextTeamIndex = 0;
+        }
         String team = assignTeam();
         if (team == null) return null;
         entries.add(new LobbyEntry(playerId, team));
@@ -65,6 +68,7 @@ public class GameLobby {
         state = State.WAITING;
         entries.clear();
         teamCount = 2;
+        nextTeamIndex = 0;
         currentRound = 0;
         for (int i = 0; i < roundWins.length; i++) roundWins[i] = 0;
     }
@@ -88,14 +92,14 @@ public class GameLobby {
 
     private String assignTeam() {
         int[] counts = teamCounts();
-        int minCount = Integer.MAX_VALUE, minIdx = -1;
-        for (int i = 0; i < teamCount; i++) {
-            if (counts[i] < MAX_PER_TEAM && counts[i] < minCount) {
-                minCount = counts[i];
-                minIdx = i;
+        for (int offset = 0; offset < teamCount; offset++) {
+            int idx = (nextTeamIndex + offset) % teamCount;
+            if (counts[idx] < MAX_PER_TEAM) {
+                nextTeamIndex = (idx + 1) % teamCount;
+                return TEAM_NAMES[idx];
             }
         }
-        return minIdx >= 0 ? TEAM_NAMES[minIdx] : null;
+        return null;
     }
 
     private int[] teamCounts() {

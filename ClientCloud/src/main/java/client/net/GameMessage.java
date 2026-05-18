@@ -17,6 +17,7 @@ public class GameMessage {
     public String status; // "WAITING" | "STARTING"
     public String mapResource;
     public Integer minPlayers;
+    public Integer countdownSeconds;
     public Long seed; // RNG seed for power-up positions
     public Integer powerUpIndex;
     public Integer powerUpRespawnBatch;

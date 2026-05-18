@@ -78,7 +78,7 @@ public class GameWindow extends JFrame implements NetworkClient.EventListener {
         net.setListener(this);
 
         // Show lobby immediately
-        lobbyPanel = new LobbyPanel(name);
+        lobbyPanel = new LobbyPanel(name, tc);
         setContentPane(lobbyPanel);
         pack();
         setPreferredSize(new Dimension(860, 560));
