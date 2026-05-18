@@ -12,16 +12,16 @@ public class GameLobby {
     private static final int MAX_PER_TEAM = 3;
     private static final int MIN_PER_TEAM = 2;
 
-    public static final int      TOTAL_ROUNDS = 3;
-    public static final String[] ROUND_MAPS   = {
+    public static final int TOTAL_ROUNDS = 3;
+    public static final String[] ROUND_MAPS = {
         "/maps/bigBattleMap.txt",
         "/maps/mapaVolcanico.txt",
         "/maps/mapaHielo.txt"
     };
 
-    private State state     = State.WAITING;
-    private int   teamCount = 2;
-    private int   currentRound = 0;  // 0 = not started; 1..TOTAL_ROUNDS during game
+    private State state = State.WAITING;
+    private int teamCount = 2;
+    private int currentRound = 0; // 0 = not started; 1..TOTAL_ROUNDS during game
     private final int[] roundWins = new int[4]; // 0=RED,1=BLUE,2=GREEN,3=YELLOW
 
     private final CopyOnWriteArrayList<LobbyEntry> entries = new CopyOnWriteArrayList<>();
@@ -92,7 +92,7 @@ public class GameLobby {
         for (int i = 0; i < teamCount; i++) {
             if (counts[i] < MAX_PER_TEAM && counts[i] < minCount) {
                 minCount = counts[i];
-                minIdx   = i;
+                minIdx = i;
             }
         }
         return minIdx >= 0 ? TEAM_NAMES[minIdx] : null;
@@ -108,16 +108,16 @@ public class GameLobby {
         return counts;
     }
 
-    public State  getState()          { return state; }
-    public int    getTeamCount()      { return teamCount; }
-    public int    getMinPlayers()     { return teamCount * MIN_PER_TEAM; }
-    public int    getMaxPlayers()     { return teamCount * MAX_PER_TEAM; }
-    public int    getCurrentPlayers() { return entries.size(); }
-    public int    getCurrentRound()   { return currentRound; }
-    public int[]  getRoundWins()      { return roundWins.clone(); }
+    public State getState() { return state; }
+    public int getTeamCount() { return teamCount; }
+    public int getMinPlayers() { return teamCount * MIN_PER_TEAM; }
+    public int getMaxPlayers() { return teamCount * MAX_PER_TEAM; }
+    public int getCurrentPlayers() { return entries.size(); }
+    public int getCurrentRound() { return currentRound; }
+    public int[] getRoundWins() { return roundWins.clone(); }
 
     /** Kept for backward-compat; returns the map for the current round. */
-    public String getMapResource()    { return getCurrentMapResource(); }
+    public String getMapResource() { return getCurrentMapResource(); }
 
     public List<LobbyEntry> getEntries() { return new ArrayList<>(entries); }
 }

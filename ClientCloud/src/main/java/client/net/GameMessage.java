@@ -14,17 +14,18 @@ public class GameMessage {
 
     // Lobby / game-start fields
     public Integer teamCount;
-    public String status;       // "WAITING" | "STARTING"
+    public String status; // "WAITING" | "STARTING"
     public String mapResource;
     public Integer minPlayers;
-    public Long seed;           // RNG seed for power-up positions
+    public Long seed; // RNG seed for power-up positions
     public Integer powerUpIndex;
+    public Integer powerUpRespawnBatch;
     public List<LobbyPlayer> players;
 
     // Round fields
     public Integer roundNumber;
     public Integer totalRounds;
-    public String  roundWinner;
+    public String roundWinner;
     public Integer redWins, blueWins, greenWins, yellowWins;
 
     // ---- Inner types ----
@@ -75,6 +76,13 @@ public class GameMessage {
         GameMessage m = new GameMessage();
         m.type = MessageType.POWERUP_COLLECTED;
         m.powerUpIndex = index;
+        return m;
+    }
+
+    public static GameMessage powerUpRespawn(int batchIndex) {
+        GameMessage m = new GameMessage();
+        m.type = MessageType.POWERUP_RESPAWN;
+        m.powerUpRespawnBatch = batchIndex;
         return m;
     }
 

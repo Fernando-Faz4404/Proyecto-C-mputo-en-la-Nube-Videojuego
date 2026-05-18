@@ -18,12 +18,13 @@ public class JSON_GameMessage {
     public Integer minPlayers;
     public Long seed;
     public Integer powerUpIndex;
+    public Integer powerUpRespawnBatch;
     public List<LobbyPlayer> players;
 
     // Round fields
     public Integer roundNumber;
     public Integer totalRounds;
-    public String  roundWinner;
+    public String roundWinner;
     public Integer redWins, blueWins, greenWins, yellowWins;
 
     public static class LobbyPlayer {
@@ -86,6 +87,13 @@ public class JSON_GameMessage {
         JSON_GameMessage m = new JSON_GameMessage();
         m.type = "POWERUP_COLLECTED";
         m.powerUpIndex = index;
+        return m;
+    }
+
+    public static JSON_GameMessage powerUpRespawn(int batchIndex) {
+        JSON_GameMessage m = new JSON_GameMessage();
+        m.type = "POWERUP_RESPAWN";
+        m.powerUpRespawnBatch = batchIndex;
         return m;
     }
 

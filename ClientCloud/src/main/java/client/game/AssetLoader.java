@@ -16,7 +16,7 @@ import java.util.Map;
 public class AssetLoader {
 
     private final Map<Integer, BufferedImage> tileImages = new HashMap<>();
-    private final Map<String,  BufferedImage> powerUpImages = new HashMap<>();
+    private final Map<String, BufferedImage> powerUpImages = new HashMap<>();
 
     private BufferedImage tankRed, tankBlue, tankGreen, tankYellow;
     private BufferedImage barrel;
@@ -33,15 +33,15 @@ public class AssetLoader {
 
     public void load() {
         // ---- Tiles ----
-        tileImages.put(0, loadTile("/tiles/grass.png",        new Color(76, 128, 56)));
-        tileImages.put(1, loadTile("/tiles/wall.png",         new Color(100, 85, 70)));
-        tileImages.put(2, loadTile("/tiles/water.png",        new Color(50, 100, 180)));
-        tileImages.put(3, loadTile("/tiles/sand.png",         new Color(194, 178, 128)));
-        tileImages.put(4, loadTile("/tiles/lava.png",         new Color(255, 80, 0)));
+        tileImages.put(0, loadTile("/tiles/grass.png", new Color(76, 128, 56)));
+        tileImages.put(1, loadTile("/tiles/wall.png", new Color(100, 85, 70)));
+        tileImages.put(2, loadTile("/tiles/water.png", new Color(50, 100, 180)));
+        tileImages.put(3, loadTile("/tiles/sand.png", new Color(194, 178, 128)));
+        tileImages.put(4, loadTile("/tiles/lava.png", new Color(255, 80, 0)));
         tileImages.put(5, loadTile("/tiles/rocaVolcanica.png",new Color(60, 60, 60)));
-        tileImages.put(6, loadTile("/tiles/aguaHielo.png",    new Color(180, 240, 255)));
-        tileImages.put(7, loadTile("/tiles/muroHielo.png",    new Color(180, 220, 255)));
-        tileImages.put(8, loadTile("/tiles/sueloHielo.png",   new Color(220, 240, 255)));
+        tileImages.put(6, loadTile("/tiles/aguaHielo.png", new Color(180, 240, 255)));
+        tileImages.put(7, loadTile("/tiles/muroHielo.png", new Color(180, 220, 255)));
+        tileImages.put(8, loadTile("/tiles/sueloHielo.png", new Color(220, 240, 255)));
 
         // ---- Tanks: load sprite, rotate -90° (facing right → facing up), scale to 48×48 ----
         BufferedImage raw1 = loadRaw("/Sprites/tanque1Derecha.png");
@@ -53,10 +53,10 @@ public class AssetLoader {
         BufferedImage tank1Up = rotateImage(raw1, -Math.PI / 2);
         BufferedImage tank2Up = rotateImage(raw2, -Math.PI / 2);
 
-        tankRed    = scaleNN(tintImage(tank1Up, new Color(220, 55,  55)),  48, 48);
-        tankBlue   = scaleNN(tintImage(tank2Up, new Color(55,  90,  220)), 48, 48);
-        tankGreen  = scaleNN(tintImage(tank1Up, new Color(50,  200, 50)),  48, 48);
-        tankYellow = scaleNN(tintImage(tank2Up, new Color(230, 200, 0)),   48, 48);
+        tankRed = scaleNN(tintImage(tank1Up, new Color(220, 55, 55)), 48, 48);
+        tankBlue = scaleNN(tintImage(tank2Up, new Color(55, 90, 220)), 48, 48);
+        tankGreen = scaleNN(tintImage(tank1Up, new Color(50, 200, 50)), 48, 48);
+        tankYellow = scaleNN(tintImage(tank2Up, new Color(230, 200, 0)), 48, 48);
 
         // ---- Barrel (programmatic — thin rectangle) ----
         barrel = makeSolidPlaceholder(6, 22, new Color(80, 80, 80));
@@ -64,21 +64,21 @@ public class AssetLoader {
         // ---- Bullets ----
         BufferedImage rawBullet = loadRaw("/Sprites/bala.png");
         if (rawBullet == null) rawBullet = makeSolidPlaceholder(8, 8, new Color(255, 230, 50));
-        bulletRed    = scaleNN(rawBullet, 12, 12);
-        bulletBlue   = scaleNN(tintImage(rawBullet, new Color(100, 180, 255)), 12, 12);
-        bulletGreen  = scaleNN(tintImage(rawBullet, new Color(100, 255, 100)), 12, 12);
-        bulletYellow = scaleNN(tintImage(rawBullet, new Color(255, 230, 80)),  12, 12);
+        bulletRed = scaleNN(rawBullet, 12, 12);
+        bulletBlue = scaleNN(tintImage(rawBullet, new Color(100, 180, 255)), 12, 12);
+        bulletGreen = scaleNN(tintImage(rawBullet, new Color(100, 255, 100)), 12, 12);
+        bulletYellow = scaleNN(tintImage(rawBullet, new Color(255, 230, 80)), 12, 12);
 
         // ---- Power-up sprites ----
-        loadPowerUpSprite("HEALTH",   "/Sprites/cura.png",      new Color(50, 210, 80));
-        loadPowerUpSprite("IMMUNITY", "/Sprites/escudo.png",     new Color(100, 180, 255));
-        loadPowerUpSprite("SPEED",    "/Sprites/velocidad.png",  new Color(255, 215, 0));
-        loadPowerUpSprite("AMMO",     "/Sprites/balaEspecial.png", new Color(255, 100, 50));
+        loadPowerUpSprite("HEALTH", "/Sprites/cura.png", new Color(50, 210, 80));
+        loadPowerUpSprite("IMMUNITY", "/Sprites/escudo.png", new Color(100, 180, 255));
+        loadPowerUpSprite("SPEED", "/Sprites/velocidad.png", new Color(255, 215, 0));
+        loadPowerUpSprite("AMMO", "/Sprites/balaEspecial.png", new Color(255, 100, 50));
 
         // ---- Explosions (programmatic) ----
         Color[] expColors = {
             new Color(255, 255, 200), new Color(255, 200, 50),
-            new Color(255, 150, 0),   new Color(200, 80, 0), new Color(100, 50, 0)
+            new Color(255, 150, 0), new Color(200, 80, 0), new Color(100, 50, 0)
         };
         explosionFrames = new BufferedImage[5];
         for (int i = 0; i < 5; i++) {
@@ -219,9 +219,9 @@ public class AssetLoader {
 
     public BufferedImage getTankImage(Team team) {
         return switch (team) {
-            case RED    -> tankRed;
-            case BLUE   -> tankBlue;
-            case GREEN  -> tankGreen;
+            case RED -> tankRed;
+            case BLUE -> tankBlue;
+            case GREEN -> tankGreen;
             case YELLOW -> tankYellow;
         };
     }
@@ -230,9 +230,9 @@ public class AssetLoader {
 
     public BufferedImage getBulletImage(Team team) {
         return switch (team) {
-            case RED    -> bulletRed;
-            case BLUE   -> bulletBlue;
-            case GREEN  -> bulletGreen;
+            case RED -> bulletRed;
+            case BLUE -> bulletBlue;
+            case GREEN -> bulletGreen;
             case YELLOW -> bulletYellow;
         };
     }

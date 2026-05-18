@@ -21,9 +21,10 @@ public class GamePanel extends JPanel implements Runnable {
     public static final int VIEW_W = 1248;
     public static final int VIEW_H = 720;
 
-    private static final int FPS           = 60;
+    private static final int FPS = 60;
     private static final int POWERUP_COUNT = 8;
-    private static final int TOTAL_ROUNDS  = 3;
+    private static final int RESPAWN_BATCH_SIZE = 5;
+    private static final int TOTAL_ROUNDS = 3;
 
     private static final String[] ROUND_MAPS = {
         "/maps/bigBattleMap.txt",
@@ -33,14 +34,14 @@ public class GamePanel extends JPanel implements Runnable {
     private static final String[] ROUND_NAMES = { "Gran Batalla", "Volcánico", "Ártico" };
 
     private final KeyHandler keyHandler = new KeyHandler();
-    private final GameMap    gameMap    = new GameMap();
-    private final HUD        hud        = new HUD();
+    private final GameMap gameMap = new GameMap();
+    private final HUD hud = new HUD();
 
-    private final Tank               localTank;
-    private final Map<String, Tank>  remoteTanks = new ConcurrentHashMap<>();
-    private final List<Bullet>       bullets     = new ArrayList<>();
-    private final List<Explosion>    explosions  = new ArrayList<>();
-    private final List<PowerUp>      powerUps    = new ArrayList<>();
+    private final Tank localTank;
+    private final Map<String, Tank> remoteTanks = new ConcurrentHashMap<>();
+    private final List<Bullet> bullets = new ArrayList<>();
+    private final List<Explosion> explosions = new ArrayList<>();
+    private final List<PowerUp> powerUps = new ArrayList<>();
 
     // Kill scores (current round)
     private int redScore, blueScore, greenScore, yellowScore;
@@ -48,21 +49,23 @@ public class GamePanel extends JPanel implements Runnable {
     // Round wins (cumulative across rounds)
     private int redWins, blueWins, greenWins, yellowWins;
 
-    private int currentRound  = 1;
+    private int currentRound = 1;
     private boolean roundOver = false;
-    private boolean gameOver  = false;
-    private String  roundWinnerTeam = null;
+    private boolean gameOver = false;
+    private String roundWinnerTeam = null;
 
-    private final int  teamCount;
-    private Thread     gameThread;
+    private final int teamCount;
+    private Thread gameThread;
     private final NetworkClient net;
     private final boolean testMode;
 
     private Runnable onReturnToMenu = null;
 
-    private long speedUntil    = 0;
+    private long speedUntil = 0;
     private long immunityUntil = 0;
-    private long ammoUntil     = 0;
+    private long ammoUntil = 0;
+
+    private long gameSeed = 0;
 
     // Used to fire N-key round advance only once per press
     private boolean lastNextRound = false;
@@ -74,8 +77,8 @@ public class GamePanel extends JPanel implements Runnable {
     public GamePanel(String playerName, Team team, String mapResource,
                      int teamCount, long seed, NetworkClient net) {
         this.teamCount = teamCount;
-        this.net       = net;
-        this.testMode  = (net == null);
+        this.net = net;
+        this.testMode = (net == null);
 
         AssetLoader.get().load();
         gameMap.load(mapResource);
@@ -89,6 +92,7 @@ public class GamePanel extends JPanel implements Runnable {
         double[] spawn = spawnPosition(team, teamCount);
         localTank = new Tank(playerName, team, spawn[0], spawn[1]);
 
+        this.gameSeed = seed;
         spawnPowerUps(seed);
     }
 
@@ -96,9 +100,9 @@ public class GamePanel extends JPanel implements Runnable {
 
     private void spawnPowerUps(long seed) {
         Random rng = new Random(seed);
-        int ts     = GameMap.TILE_SIZE;
-        int cols   = gameMap.getCols();
-        int rows   = gameMap.getRows();
+        int ts = GameMap.TILE_SIZE;
+        int cols = gameMap.getCols();
+        int rows = gameMap.getRows();
 
         List<int[]> candidates = new ArrayList<>();
         for (int r = 2; r < rows - 2; r++) {
@@ -109,8 +113,13 @@ public class GamePanel extends JPanel implements Runnable {
         }
         Collections.shuffle(candidates, rng);
 
-        Set<String>    usedKeys = new HashSet<>();
-        PowerUp.Type[] types    = PowerUp.Type.values();
+        // Build a balanced type pool: each type appears as evenly as possible
+        PowerUp.Type[] types = PowerUp.Type.values();
+        List<PowerUp.Type> typePool = new ArrayList<>();
+        for (int i = 0; i < POWERUP_COUNT; i++) typePool.add(types[i % types.length]);
+        Collections.shuffle(typePool, rng);
+
+        Set<String> usedKeys = new HashSet<>();
         int added = 0;
         for (int[] pos : candidates) {
             if (added >= POWERUP_COUNT) break;
@@ -118,7 +127,49 @@ public class GamePanel extends JPanel implements Runnable {
             if (usedKeys.contains(key)) continue;
             usedKeys.add(key);
             powerUps.add(new PowerUp(pos[0] * ts + ts / 2.0, pos[1] * ts + ts / 2.0,
-                    types[rng.nextInt(types.length)]));
+                    typePool.get(added)));
+            added++;
+        }
+    }
+
+    /** Spawns a fresh batch of items after every RESPAWN_BATCH_SIZE collections. */
+    private void respawnBatch(int batchIndex) {
+        long batchSeed = gameSeed + (long) batchIndex * 31337L;
+        Random rng = new Random(batchSeed);
+        int ts = GameMap.TILE_SIZE;
+        int cols = gameMap.getCols();
+        int rows = gameMap.getRows();
+
+        // Avoid tiles that already have an active (non-collected) power-up
+        Set<String> occupied = new HashSet<>();
+        for (PowerUp p : powerUps) {
+            if (!p.isCollected()) {
+                occupied.add((int)(p.getX() / ts) + "," + (int)(p.getY() / ts));
+            }
+        }
+
+        List<int[]> candidates = new ArrayList<>();
+        for (int r = 2; r < rows - 2; r++) {
+            for (int c = 2; c < cols - 2; c++) {
+                if (!gameMap.isSolid(c * ts + ts / 2.0, r * ts + ts / 2.0))
+                    candidates.add(new int[]{c, r});
+            }
+        }
+        Collections.shuffle(candidates, rng);
+
+        PowerUp.Type[] types = PowerUp.Type.values();
+        List<PowerUp.Type> typePool = new ArrayList<>();
+        for (int i = 0; i < RESPAWN_BATCH_SIZE; i++) typePool.add(types[i % types.length]);
+        Collections.shuffle(typePool, rng);
+
+        int added = 0;
+        for (int[] pos : candidates) {
+            if (added >= RESPAWN_BATCH_SIZE) break;
+            String key = pos[0] + "," + pos[1];
+            if (occupied.contains(key)) continue;
+            occupied.add(key);
+            powerUps.add(new PowerUp(pos[0] * ts + ts / 2.0, pos[1] * ts + ts / 2.0,
+                    typePool.get(added)));
             added++;
         }
     }
@@ -133,13 +184,13 @@ public class GamePanel extends JPanel implements Runnable {
 
     @Override
     public void run() {
-        double interval = 1_000_000_000.0 / FPS;
-        double delta    = 0;
-        long   last     = System.nanoTime();
+        double interval = 1000000000.0 / FPS;
+        double delta = 0;
+        long last = System.nanoTime();
         while (gameThread != null) {
             long now = System.nanoTime();
             delta += (now - last) / interval;
-            last   = now;
+            last = now;
             if (delta >= 1) { update(); repaint(); delta--; }
             try { Thread.sleep(1); } catch (InterruptedException ignored) {}
         }
@@ -188,9 +239,9 @@ public class GamePanel extends JPanel implements Runnable {
         if (localTank.isAlive()) {
             double oldX = localTank.getX(), oldY = localTank.getY();
 
-            if (keyHandler.up)    localTank.moveForward();
-            if (keyHandler.down)  localTank.moveBackward();
-            if (keyHandler.left)  localTank.rotateLeft();
+            if (keyHandler.up) localTank.moveForward();
+            if (keyHandler.down) localTank.moveBackward();
+            if (keyHandler.left) localTank.rotateLeft();
             if (keyHandler.right) localTank.rotateRight();
 
             if (collidesWithWalls(localTank) || collidesWithTanks(localTank)) {
@@ -380,9 +431,9 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void drawRoundScoreboard(Graphics2D g2, int cx, int cy) {
-        Team[]   teams = { Team.RED, Team.BLUE, Team.GREEN, Team.YELLOW };
-        int[]    wins  = { redWins, blueWins, greenWins, yellowWins };
-        int[]    kills = { redScore, blueScore, greenScore, yellowScore };
+        Team[] teams = { Team.RED, Team.BLUE, Team.GREEN, Team.YELLOW };
+        int[] wins = { redWins, blueWins, greenWins, yellowWins };
+        int[] kills = { redScore, blueScore, greenScore, yellowScore };
 
         int panelW = 360, panelH = 30 + teamCount * 34 + 14;
         int panelX = cx - panelW / 2, panelY = cy - 60;
@@ -454,6 +505,7 @@ public class GamePanel extends JPanel implements Runnable {
         synchronized (bullets) { bullets.clear(); }
         explosions.clear();
         powerUps.clear();
+        gameSeed = seed;
         spawnPowerUps(seed);
 
         redScore = blueScore = greenScore = yellowScore = 0;
@@ -466,9 +518,9 @@ public class GamePanel extends JPanel implements Runnable {
     private void simulateRoundEnd() {
         // Award the round to the local player's team
         switch (localTank.getTeam()) {
-            case RED    -> redWins++;
-            case BLUE   -> blueWins++;
-            case GREEN  -> greenWins++;
+            case RED -> redWins++;
+            case BLUE -> blueWins++;
+            case GREEN -> greenWins++;
             case YELLOW -> yellowWins++;
         }
         roundWinnerTeam = localTank.getTeam().name();
@@ -479,13 +531,13 @@ public class GamePanel extends JPanel implements Runnable {
     // ---- Spawn positions ----
 
     private double[] spawnPosition(Team team, int tc) {
-        int ts   = GameMap.TILE_SIZE;
+        int ts = GameMap.TILE_SIZE;
         int cols = gameMap.getCols();
         int rows = gameMap.getRows();
         return switch (team) {
-            case RED    -> new double[]{ 3 * ts, 2 * ts };
-            case BLUE   -> new double[]{ (cols - 4) * ts, 2 * ts };
-            case GREEN  -> new double[]{ 3 * ts, (rows - 3) * ts };
+            case RED -> new double[]{ 3 * ts, 2 * ts };
+            case BLUE -> new double[]{ (cols - 4) * ts, 2 * ts };
+            case GREEN -> new double[]{ 3 * ts, (rows - 3) * ts };
             case YELLOW -> new double[]{ (cols - 4) * ts, (rows - 3) * ts };
         };
     }
@@ -495,10 +547,10 @@ public class GamePanel extends JPanel implements Runnable {
     private void applyPowerUp(PowerUp.Type type) {
         long now = System.currentTimeMillis();
         switch (type) {
-            case SPEED    -> speedUntil    = now + 5_000;
+            case SPEED -> speedUntil = now + 5_000;
             case IMMUNITY -> immunityUntil = now + 4_000;
-            case AMMO     -> ammoUntil     = now + 8_000;
-            case HEALTH   -> localTank.addHealth(40);
+            case AMMO -> ammoUntil = now + 8_000;
+            case HEALTH -> localTank.addHealth(40);
         }
     }
 
@@ -552,14 +604,21 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     public void onRemotePowerUpCollected(int index) {
-        if (index >= 0 && index < powerUps.size()) powerUps.get(index).collect();
+        if (index >= 0 && index < powerUps.size()) {
+            powerUps.get(index).collect();
+        }
+    }
+
+    /** Called when the server confirms a respawn batch should occur. */
+    public void onPowerUpRespawn(int batchIndex) {
+        respawnBatch(batchIndex);
     }
 
     public void onRoundEnd(int round, int total, String winner,
                            int rw, int bw, int gw, int yw) {
-        currentRound    = round;
+        currentRound = round;
         roundWinnerTeam = winner;
-        redWins   = rw; blueWins  = bw;
+        redWins = rw; blueWins = bw;
         greenWins = gw; yellowWins = yw;
         roundOver = true;
         if (round >= total) gameOver = true;
@@ -567,7 +626,7 @@ public class GamePanel extends JPanel implements Runnable {
 
     public void onRoundStart(int round, int total, String mapResource, long seed,
                              int rw, int bw, int gw, int yw) {
-        redWins   = rw; blueWins  = bw;
+        redWins = rw; blueWins = bw;
         greenWins = gw; yellowWins = yw;
         SwingUtilities.invokeLater(() -> resetForRound(round, mapResource, seed));
     }

@@ -10,18 +10,18 @@ public class MainMenuPanel extends JPanel {
 
     // ---- Colors ----
     private static final Color BG_BLOCK_BASE = new Color(30, 26, 22);
-    private static final Color TITLE_MAIN    = new Color(255, 215, 20);
-    private static final Color TITLE_SHADOW  = new Color(63, 53, 5);
-    private static final Color TEXT_WHITE    = new Color(255, 255, 255);
-    private static final Color TEXT_GRAY     = new Color(180, 180, 180);
-    private static final Color TEXT_YELLOW   = new Color(255, 230, 50);
-    private static final Color FIELD_BG      = new Color(0, 0, 0, 200);
-    private static final Color FIELD_BORDER  = new Color(140, 140, 140);
+    private static final Color TITLE_MAIN = new Color(255, 215, 20);
+    private static final Color TITLE_SHADOW = new Color(63, 53, 5);
+    private static final Color TEXT_WHITE = new Color(255, 255, 255);
+    private static final Color TEXT_GRAY = new Color(180, 180, 180);
+    private static final Color TEXT_YELLOW = new Color(255, 230, 50);
+    private static final Color FIELD_BG = new Color(0, 0, 0, 200);
+    private static final Color FIELD_BORDER = new Color(140, 140, 140);
 
     // ---- Fonts ----
     private static final Font F_TITLE = new Font("Monospaced", Font.BOLD, 72);
-    private static final Font F_HEAD  = new Font("Monospaced", Font.BOLD, 16);
-    private static final Font F_BODY  = new Font("Monospaced", Font.PLAIN, 13);
+    private static final Font F_HEAD = new Font("Monospaced", Font.BOLD, 16);
+    private static final Font F_BODY = new Font("Monospaced", Font.PLAIN, 13);
     private static final Font F_SMALL = new Font("Monospaced", Font.PLAIN, 11);
 
     private static final int BLOCK_SZ = 16;
@@ -29,9 +29,9 @@ public class MainMenuPanel extends JPanel {
     private BufferedImage bgCache;
     private int cachedW = -1, cachedH = -1;
 
-    private final JTextField     nameField;
+    private final JTextField nameField;
     private final JComboBox<String> teamBox;
-    private final JLabel         statusLabel;
+    private final JLabel statusLabel;
 
     public MainMenuPanel(BiConsumer<String, Integer> onJoin, Runnable onTestMode) {
         setOpaque(false);
@@ -104,9 +104,9 @@ public class MainMenuPanel extends JPanel {
                 doLayout();
         });
 
-        putClientProperty("joinBtn",     joinBtn);
+        putClientProperty("joinBtn", joinBtn);
         putClientProperty("tutorialBtn", tutorialBtn);
-        putClientProperty("skipBtn",     skipBtn);
+        putClientProperty("skipBtn", skipBtn);
     }
 
     // ---- Layout ----
@@ -164,9 +164,9 @@ public class MainMenuPanel extends JPanel {
         for (int y = 0; y < h; y += BLOCK_SZ) {
             for (int x = 0; x < w; x += BLOCK_SZ) {
                 int hash = ((x * 31) ^ (y * 37)) & 0xFF;
-                int r  = BG_BLOCK_BASE.getRed()   + (hash % 14);
+                int r = BG_BLOCK_BASE.getRed() + (hash % 14);
                 int gv = BG_BLOCK_BASE.getGreen() + ((hash >> 2) % 10) - 2;
-                int b  = BG_BLOCK_BASE.getBlue()  - (hash % 6);
+                int b = BG_BLOCK_BASE.getBlue() - (hash % 6);
                 g.setColor(new Color(clamp(r), clamp(gv), clamp(b)));
                 g.fillRect(x, y, BLOCK_SZ, BLOCK_SZ);
                 g.setColor(new Color(0, 0, 0, 55));
@@ -218,7 +218,7 @@ public class MainMenuPanel extends JPanel {
                 formY - 6, TEXT_YELLOW, new Color(63, 53, 0), 2);
 
         g2.setFont(F_BODY);
-        drawShadowText(g2, "Nombre:",  cx - 140, formY + 23, TEXT_WHITE, Color.BLACK, 1);
+        drawShadowText(g2, "Nombre:", cx - 140, formY + 23, TEXT_WHITE, Color.BLACK, 1);
         drawShadowText(g2, "Equipos:", cx - 140, formY + 65, TEXT_WHITE, Color.BLACK, 1);
     }
 
@@ -226,7 +226,7 @@ public class MainMenuPanel extends JPanel {
         g2.setFont(F_SMALL);
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
                 RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
-        drawShadowText(g2, "Tank Wars 2025  —  Proyecto Cómputo en la Nube",
+        drawShadowText(g2, "Tank Wars 2025 — Proyecto Cómputo en la Nube",
                 8, h - 8, TEXT_GRAY, Color.BLACK, 1);
     }
 
@@ -292,28 +292,28 @@ public class MainMenuPanel extends JPanel {
                 FontMetrics fm = g2.getFontMetrics();
 
                 Object[][] rows = {
-                    { "MOVIMIENTO",   null },
-                    { "  W / S",      "Avanzar / Retroceder" },
-                    { "  A / D",      "Rotar izquierda / derecha" },
-                    { "  ESPACIO",    "Disparar" },
-                    { "  R",          "Reaparecer" },
-                    { "",             null },
-                    { "POWER-UPS",    null },
-                    { "  Cura",       "+40 HP  (verde)" },
-                    { "  Escudo",     "Inmunidad 4s  (azul)" },
-                    { "  Velocidad",  "x2 vel. 5s  (dorado)" },
-                    { "  Bala esp.",  "Disparo rápido 8s  (naranja)" },
-                    { "",             null },
-                    { "REGLAS",       null },
-                    { "  Equipos",    "2 a 4 equipos" },
-                    { "  Min/Max",    "2 / 3 jugadores por equipo" },
-                    { "  Items",      "Un solo uso, sin reaparición" },
+                    { "MOVIMIENTO", null },
+                    { " W / S", "Avanzar / Retroceder" },
+                    { " A / D", "Rotar izquierda / derecha" },
+                    { " ESPACIO", "Disparar" },
+                    { " R", "Reaparecer" },
+                    { "", null },
+                    { "POWER-UPS", null },
+                    { " Cura", "+40 HP (verde)" },
+                    { " Escudo", "Inmunidad 4s (azul)" },
+                    { " Velocidad", "x2 vel. 5s (dorado)" },
+                    { " Bala esp.", "Disparo rápido 8s (naranja)" },
+                    { "", null },
+                    { "REGLAS", null },
+                    { " Equipos", "2 a 4 equipos" },
+                    { " Min/Max", "2 / 3 jugadores por equipo" },
+                    { " Items", "Un solo uso, sin reaparición" },
                 };
 
                 int lh = fm.getHeight() + 3;
-                int y  = fm.getAscent() + 4;
+                int y = fm.getAscent() + 4;
                 for (Object[] row : rows) {
-                    String left  = (String) row[0];
+                    String left = (String) row[0];
                     String right = (String) row[1];
                     if (left.isEmpty()) { y += 6; continue; }
 
@@ -453,10 +453,10 @@ public class MainMenuPanel extends JPanel {
     // ---- Minecraft button ----
 
     public static class MinecraftButton extends JButton {
-        private static final Color BTN_BASE   = new Color(85, 85, 85);
-        private static final Color BTN_HOVER  = new Color(110, 110, 110);
-        private static final Color BTN_PRESS  = new Color(65, 65, 65);
-        private static final Color BTN_HIGH   = new Color(190, 190, 190);
+        private static final Color BTN_BASE = new Color(85, 85, 85);
+        private static final Color BTN_HOVER = new Color(110, 110, 110);
+        private static final Color BTN_PRESS = new Color(65, 65, 65);
+        private static final Color BTN_HIGH = new Color(190, 190, 190);
         private static final Color BTN_SHADOW = new Color(35, 35, 35);
 
         private final Color textColor;

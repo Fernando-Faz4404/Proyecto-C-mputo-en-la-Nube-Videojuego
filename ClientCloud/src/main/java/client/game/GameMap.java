@@ -87,7 +87,7 @@ public class GameMap {
         return walls;
     }
 
-    public int getWidthPixels()  { return cols * TILE_SIZE; }
+    public int getWidthPixels() { return cols * TILE_SIZE; }
     public int getHeightPixels() { return rows * TILE_SIZE; }
     public int getCols() { return cols; }
     public int getRows() { return rows; }

@@ -8,7 +8,7 @@ public class TankesitosServer {
   
     public static void main(String[] args) {
         try{
-            //Creamos el socket server            
+            //Creamos el socket server 
             ServerSocket serverSocket = new ServerSocket(2555);
             Server server = new Server(serverSocket);
             

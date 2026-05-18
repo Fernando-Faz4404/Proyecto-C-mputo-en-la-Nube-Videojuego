@@ -27,6 +27,7 @@ public class NetworkClient {
         void onRemoteDisconnect(String id);
         void onScoreUpdate(int red, int blue, int green, int yellow);
         void onPowerUpCollected(int index);
+        void onPowerUpRespawn(int batchIndex);
         void onRoundEnd(int round, int total, String winner,
                         int redWins, int blueWins, int greenWins, int yellowWins);
         void onRoundStart(int round, int total, String mapResource, long seed,
@@ -34,30 +35,30 @@ public class NetworkClient {
     }
 
     private final String serverIp;
-    private final int    serverPort;
-    private final Gson   gson = new Gson();
+    private final int serverPort;
+    private final Gson gson = new Gson();
 
     private EventListener listener;
-    private Socket           socket;
+    private Socket socket;
     private DataOutputStream dos;
-    private DataInputStream  dis;
+    private DataInputStream dis;
     private volatile boolean connected;
 
     // Stored until connect() is called
     private String pendingPlayerId;
     private String pendingTeam;
-    private int    pendingTeamCount;
+    private int pendingTeamCount;
 
     public NetworkClient(String serverIp, int serverPort) {
-        this.serverIp   = serverIp;
+        this.serverIp = serverIp;
         this.serverPort = serverPort;
     }
 
     public void setListener(EventListener l) { this.listener = l; }
 
     public void connect(String playerId, String team, int teamCount) {
-        this.pendingPlayerId  = playerId;
-        this.pendingTeam      = team;
+        this.pendingPlayerId = playerId;
+        this.pendingTeam = team;
         this.pendingTeamCount = teamCount;
 
         Thread t = new Thread(() -> {
@@ -105,7 +106,7 @@ public class NetworkClient {
         if (msg.type == null || listener == null) return;
         switch (msg.type) {
             case LOBBY_STATE -> listener.onLobbyState(msg);
-            case GAME_START  -> listener.onGameStart(msg);
+            case GAME_START -> listener.onGameStart(msg);
             case MOVE, STATE_UPDATE, JOIN -> {
                 if (msg.playerId != null && !msg.playerId.equals(pendingPlayerId)
                         && msg.team != null) {
@@ -133,30 +134,33 @@ public class NetworkClient {
                 if (msg.playerId != null) listener.onRemoteDisconnect(msg.playerId);
             }
             case SCORE_UPDATE -> listener.onScoreUpdate(
-                    msg.redScore    != null ? msg.redScore    : 0,
-                    msg.blueScore   != null ? msg.blueScore   : 0,
-                    msg.greenScore  != null ? msg.greenScore  : 0,
+                    msg.redScore != null ? msg.redScore : 0,
+                    msg.blueScore != null ? msg.blueScore : 0,
+                    msg.greenScore != null ? msg.greenScore : 0,
                     msg.yellowScore != null ? msg.yellowScore : 0);
             case POWERUP_COLLECTED -> {
                 if (msg.powerUpIndex != null) listener.onPowerUpCollected(msg.powerUpIndex);
             }
+            case POWERUP_RESPAWN -> {
+                if (msg.powerUpRespawnBatch != null) listener.onPowerUpRespawn(msg.powerUpRespawnBatch);
+            }
             case ROUND_END -> listener.onRoundEnd(
-                    msg.roundNumber  != null ? msg.roundNumber  : 1,
-                    msg.totalRounds  != null ? msg.totalRounds  : 3,
-                    msg.roundWinner  != null ? msg.roundWinner  : "DRAW",
-                    msg.redWins      != null ? msg.redWins      : 0,
-                    msg.blueWins     != null ? msg.blueWins     : 0,
-                    msg.greenWins    != null ? msg.greenWins    : 0,
-                    msg.yellowWins   != null ? msg.yellowWins   : 0);
+                    msg.roundNumber != null ? msg.roundNumber : 1,
+                    msg.totalRounds != null ? msg.totalRounds : 3,
+                    msg.roundWinner != null ? msg.roundWinner : "DRAW",
+                    msg.redWins != null ? msg.redWins : 0,
+                    msg.blueWins != null ? msg.blueWins : 0,
+                    msg.greenWins != null ? msg.greenWins : 0,
+                    msg.yellowWins != null ? msg.yellowWins : 0);
             case ROUND_START -> listener.onRoundStart(
-                    msg.roundNumber  != null ? msg.roundNumber  : 2,
-                    msg.totalRounds  != null ? msg.totalRounds  : 3,
-                    msg.mapResource  != null ? msg.mapResource  : "/maps/bigBattleMap.txt",
-                    msg.seed         != null ? msg.seed         : System.currentTimeMillis(),
-                    msg.redWins      != null ? msg.redWins      : 0,
-                    msg.blueWins     != null ? msg.blueWins     : 0,
-                    msg.greenWins    != null ? msg.greenWins    : 0,
-                    msg.yellowWins   != null ? msg.yellowWins   : 0);
+                    msg.roundNumber != null ? msg.roundNumber : 2,
+                    msg.totalRounds != null ? msg.totalRounds : 3,
+                    msg.mapResource != null ? msg.mapResource : "/maps/bigBattleMap.txt",
+                    msg.seed != null ? msg.seed : System.currentTimeMillis(),
+                    msg.redWins != null ? msg.redWins : 0,
+                    msg.blueWins != null ? msg.blueWins : 0,
+                    msg.greenWins != null ? msg.greenWins : 0,
+                    msg.yellowWins != null ? msg.yellowWins : 0);
             default -> {}
         }
     }
@@ -173,7 +177,7 @@ public class NetworkClient {
     }
 
     public boolean isConnected() { return connected; }
-    public String getPlayerId()  { return pendingPlayerId; }
+    public String getPlayerId() { return pendingPlayerId; }
 
     public synchronized void disconnect() {
         connected = false;
@@ -190,7 +194,7 @@ public class NetworkClient {
                 for (InterfaceAddress ia : nif.getInterfaceAddresses()) {
                     if (!(ia.getAddress() instanceof Inet4Address)) continue;
                     byte[] local = ia.getAddress().getAddress();
-                    byte[] mask  = prefixToMask(ia.getNetworkPrefixLength());
+                    byte[] mask = prefixToMask(ia.getNetworkPrefixLength());
                     boolean same = true;
                     for (int i = 0; i < 4; i++) {
                         if ((local[i] & mask[i]) != (remote[i] & mask[i])) { same = false; break; }

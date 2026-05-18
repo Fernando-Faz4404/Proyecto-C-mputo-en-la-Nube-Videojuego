@@ -20,27 +20,32 @@ public class PlayerHandler implements Runnable {
     public static final CopyOnWriteArrayList<PlayerHandler> playerHandlers = new CopyOnWriteArrayList<>();
     public static final GameLobby lobby = new GameLobby();
 
-    private static final AtomicInteger numPlayers  = new AtomicInteger(1);
-    private static final AtomicInteger redScore    = new AtomicInteger(0);
-    private static final AtomicInteger blueScore   = new AtomicInteger(0);
-    private static final AtomicInteger greenScore  = new AtomicInteger(0);
+    private static final AtomicInteger numPlayers = new AtomicInteger(1);
+    private static final AtomicInteger redScore = new AtomicInteger(0);
+    private static final AtomicInteger blueScore = new AtomicInteger(0);
+    private static final AtomicInteger greenScore = new AtomicInteger(0);
     private static final AtomicInteger yellowScore = new AtomicInteger(0);
     private static volatile long gameSeed = 0;
 
-    private final int     internalId;
-    private final Gson    gson = new Gson();
+    // Power-up respawn tracking (server is the authority)
+    private static final java.util.Set<Integer> collectedThisBatch =
+            java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+    private static final AtomicInteger respawnBatchCount = new AtomicInteger(0);
+
+    private final int internalId;
+    private final Gson gson = new Gson();
     private java.net.Socket socket;
     private DataOutputStream dos;
-    private DataInputStream  dis;
+    private DataInputStream dis;
 
-    private String  playerId;
-    private String  team;
-    private double  posX, posY, angle;
-    private int     health = 100;
-    private boolean alive  = true;
+    private String playerId;
+    private String team;
+    private double posX, posY, angle;
+    private int health = 100;
+    private boolean alive = true;
 
     public PlayerHandler(java.net.Socket socket) {
-        this.socket     = socket;
+        this.socket = socket;
         this.internalId = numPlayers.getAndIncrement();
         try {
             this.dos = new DataOutputStream(socket.getOutputStream());
@@ -48,10 +53,10 @@ public class PlayerHandler implements Runnable {
 
             // Read JOIN message
             String joinJson = dis.readUTF();
-            JsonObject jo   = JsonParser.parseString(joinJson).getAsJsonObject();
-            this.playerId   = jo.has("playerId") ? jo.get("playerId").getAsString()
+            JsonObject jo = JsonParser.parseString(joinJson).getAsJsonObject();
+            this.playerId = jo.has("playerId") ? jo.get("playerId").getAsString()
                                                  : "Player" + internalId;
-            int prefTeams   = jo.has("teamCount") ? jo.get("teamCount").getAsInt() : 2;
+            int prefTeams = jo.has("teamCount") ? jo.get("teamCount").getAsInt() : 2;
 
             String assignedTeam = lobby.addPlayer(playerId, prefTeams);
             if (assignedTeam == null) {
@@ -99,28 +104,43 @@ public class PlayerHandler implements Runnable {
 
     private void handleMessage(String json) {
         try {
-            JsonObject jo   = JsonParser.parseString(json).getAsJsonObject();
-            String     type = jo.get("type").getAsString();
+            JsonObject jo = JsonParser.parseString(json).getAsJsonObject();
+            String type = jo.get("type").getAsString();
 
             switch (type) {
                 case "MOVE" -> {
                     JSON_GameMessage d = gson.fromJson(json, JSON_GameMessage.class);
-                    if (d.x      != null) posX   = d.x;
-                    if (d.y      != null) posY   = d.y;
-                    if (d.angle  != null) angle  = d.angle;
+                    if (d.x != null) posX = d.x;
+                    if (d.y != null) posY = d.y;
+                    if (d.angle != null) angle = d.angle;
                     if (d.health != null) health = d.health;
-                    if (d.alive  != null) alive  = d.alive;
+                    if (d.alive != null) alive = d.alive;
                     broadcastOthers(json);
                 }
-                case "SHOOT"  -> broadcastOthers(json);
-                case "DEATH"  -> {
-                    alive  = false;
+                case "SHOOT" -> broadcastOthers(json);
+                case "DEATH" -> {
+                    alive = false;
                     health = 0;
                     incrementOpponentScore();
                     broadcastOthers(json);
                     checkRoundEnd();
                 }
-                case "POWERUP_COLLECTED" -> broadcastOthers(json);
+                case "POWERUP_COLLECTED" -> {
+                    broadcastOthers(json);
+                    // Server tracks unique collections per batch and triggers respawn
+                    if (jo.has("powerUpIndex")) {
+                        int idx = jo.get("powerUpIndex").getAsInt();
+                        boolean isNew = collectedThisBatch.add(idx);
+                        if (isNew && collectedThisBatch.size() >= 5) {
+                            collectedThisBatch.clear();
+                            int batch = respawnBatchCount.incrementAndGet();
+                            String respawnJson = new Gson().toJson(
+                                    JSON_GameMessage.powerUpRespawn(batch));
+                            broadcastAll(respawnJson);
+                            System.out.println("[Server] PowerUp respawn batch " + batch);
+                        }
+                    }
+                }
                 default -> {}
             }
         } catch (Exception e) {
@@ -149,8 +169,8 @@ public class PlayerHandler implements Runnable {
 
         String winner = survivors.isEmpty() ? "DRAW" : survivors.get(0);
         boolean moreRounds = lobby.advanceRound(winner);
-        int[]   wins       = lobby.getRoundWins();
-        int     doneRound  = lobby.getCurrentRound() - 1;
+        int[] wins = lobby.getRoundWins();
+        int doneRound = lobby.getCurrentRound() - 1;
 
         String endJson = new Gson().toJson(JSON_GameMessage.roundEnd(
                 doneRound, GameLobby.TOTAL_ROUNDS, winner,
@@ -162,11 +182,13 @@ public class PlayerHandler implements Runnable {
             // Reset alive/health for next round
             for (PlayerHandler ph : playerHandlers) { ph.alive = true; ph.health = 100; }
             redScore.set(0); blueScore.set(0); greenScore.set(0); yellowScore.set(0);
+            collectedThisBatch.clear();
+            respawnBatchCount.set(0);
 
-            final long   newSeed   = System.currentTimeMillis();
-            final int    nextRound = lobby.getCurrentRound();
-            final String nextMap   = lobby.getCurrentMapResource();
-            final int[]  finalWins = wins;
+            final long newSeed = System.currentTimeMillis();
+            final int nextRound = lobby.getCurrentRound();
+            final String nextMap = lobby.getCurrentMapResource();
+            final int[] finalWins = wins;
 
             new Thread(() -> {
                 try { Thread.sleep(5000); } catch (InterruptedException ignored) {}
@@ -186,9 +208,9 @@ public class PlayerHandler implements Runnable {
         int r = redScore.get(), b = blueScore.get(),
             g = greenScore.get(), y = yellowScore.get();
         switch (team) {
-            case "RED"    -> b = blueScore.incrementAndGet();
-            case "BLUE"   -> r = redScore.incrementAndGet();
-            case "GREEN"  -> y = yellowScore.incrementAndGet();
+            case "RED" -> b = blueScore.incrementAndGet();
+            case "BLUE" -> r = redScore.incrementAndGet();
+            case "GREEN" -> y = yellowScore.incrementAndGet();
             case "YELLOW" -> g = greenScore.incrementAndGet();
         }
         String scoreJson = gson.toJson(
@@ -263,7 +285,7 @@ public class PlayerHandler implements Runnable {
 
     private void closeQuietly() {
         try { if (socket != null) socket.close(); } catch (IOException ignored) {}
-        try { if (dis    != null) dis.close();    } catch (IOException ignored) {}
-        try { if (dos    != null) dos.close();    } catch (IOException ignored) {}
+        try { if (dis != null) dis.close(); } catch (IOException ignored) {}
+        try { if (dos != null) dos.close(); } catch (IOException ignored) {}
     }
 }

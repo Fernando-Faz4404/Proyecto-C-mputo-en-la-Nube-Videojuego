@@ -13,13 +13,13 @@ public class Server {
     }
     
     
-    // Esta funcion estara esperando hasta que un jugador nuevo se conecte   
+    // Esta funcion estara esperando hasta que un jugador nuevo se conecte 
     public void startServer(){
         while(!serverSocket.isClosed()){
  
             try{
-//               Aqui se detiene a esperar una conexion
-//              Si un jugador se conecta a nuestro server socket este regresa un socket 
+// Aqui se detiene a esperar una conexion
+// Si un jugador se conecta a nuestro server socket este regresa un socket 
                 Socket socket = serverSocket.accept();
                 System.out.println("Se ha unido un nuevo jugador"); 
                 

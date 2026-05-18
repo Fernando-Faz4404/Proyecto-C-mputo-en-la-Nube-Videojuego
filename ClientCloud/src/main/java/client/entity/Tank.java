@@ -17,8 +17,8 @@ public class Tank {
     public static final int MAX_HEALTH = 100;
     public static final long SHOOT_COOLDOWN_MS = 400;
 
-    private double x, y;           // center position in pixels
-    private double angle;          // radians, 0 = up
+    private double x, y; // center position in pixels
+    private double angle; // radians, 0 = up
     private int health;
     private final Team team;
     private final String playerId;
@@ -49,7 +49,7 @@ public class Tank {
         y += Math.cos(angle) * MOVE_SPEED * 0.6 * speedMultiplier;
     }
 
-    public void rotateLeft()  { angle -= ROTATION_SPEED; }
+    public void rotateLeft() { angle -= ROTATION_SPEED; }
     public void rotateRight() { angle += ROTATION_SPEED; }
 
     public Bullet shoot() {

@@ -16,13 +16,13 @@ public class GameWindow extends JFrame implements NetworkClient.EventListener {
     private static final int VIEWPORT_W = 1248;
     private static final int VIEWPORT_H = 720;
 
-    private NetworkClient  net;
-    private LobbyPanel     lobbyPanel;
-    private GamePanel      gamePanel;
+    private NetworkClient net;
+    private LobbyPanel lobbyPanel;
+    private GamePanel gamePanel;
 
-    private String  playerName;
-    private String  assignedTeam;
-    private int     teamCount;
+    private String playerName;
+    private String assignedTeam;
+    private int teamCount;
 
     public GameWindow() {
         setTitle("Tank Wars");
@@ -45,10 +45,10 @@ public class GameWindow extends JFrame implements NetworkClient.EventListener {
     }
 
     private void onTestMode() {
-        playerName    = "TestPlayer";
-        assignedTeam  = "RED";
-        teamCount     = 2;
-        net           = null; // no server
+        playerName = "TestPlayer";
+        assignedTeam = "RED";
+        teamCount = 2;
+        net = null; // no server
 
         Team team = Team.RED;
         gamePanel = new GamePanel(playerName, team, "/maps/bigBattleMap.txt",
@@ -67,12 +67,12 @@ public class GameWindow extends JFrame implements NetworkClient.EventListener {
 
     private void onJoinClicked(String name, int tc) {
         this.playerName = name;
-        this.teamCount  = tc;
+        this.teamCount = tc;
         this.assignedTeam = "RED"; // will be overridden by server
 
         // Create network client
-        String serverIp   = loadEnvOrDefault("SERVER_IP",   "192.168.0.133");
-        int    serverPort = Integer.parseInt(loadEnvOrDefault("SERVER_PORT", "2555"));
+        String serverIp = loadEnvOrDefault("SERVER_IP", "192.168.0.133");
+        int serverPort = Integer.parseInt(loadEnvOrDefault("SERVER_PORT", "2555"));
 
         net = new NetworkClient(serverIp, serverPort);
         net.setListener(this);
@@ -163,6 +163,11 @@ public class GameWindow extends JFrame implements NetworkClient.EventListener {
     @Override
     public void onPowerUpCollected(int index) {
         if (gamePanel != null) gamePanel.onRemotePowerUpCollected(index);
+    }
+
+    @Override
+    public void onPowerUpRespawn(int batchIndex) {
+        if (gamePanel != null) gamePanel.onPowerUpRespawn(batchIndex);
     }
 
     @Override

@@ -12,28 +12,28 @@ public class PowerUp {
 
         public Color color() {
             return switch (this) {
-                case SPEED    -> new Color(255, 215, 0);
-                case HEALTH   -> new Color(50, 210, 80);
+                case SPEED -> new Color(255, 215, 0);
+                case HEALTH -> new Color(50, 210, 80);
                 case IMMUNITY -> new Color(100, 180, 255);
-                case AMMO     -> new Color(255, 100, 50);
+                case AMMO -> new Color(255, 100, 50);
             };
         }
 
         public String symbol() {
             return switch (this) {
-                case SPEED    -> "S";
-                case HEALTH   -> "+";
+                case SPEED -> "S";
+                case HEALTH -> "+";
                 case IMMUNITY -> "*";
-                case AMMO     -> "A";
+                case AMMO -> "A";
             };
         }
 
         public String label() {
             return switch (this) {
-                case SPEED    -> "SPEED";
-                case HEALTH   -> "HEALTH";
+                case SPEED -> "SPEED";
+                case HEALTH -> "HEALTH";
                 case IMMUNITY -> "SHIELD";
-                case AMMO     -> "RAPID";
+                case AMMO -> "RAPID";
             };
         }
     }

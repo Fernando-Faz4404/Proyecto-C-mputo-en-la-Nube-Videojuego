@@ -30,19 +30,19 @@ public class LobbyPanel extends JPanel {
         super.paintComponent(g);
     }
 
-    private static final Color BG       = new Color(30, 26, 22);
-    private static final Color ACCENT   = new Color(255, 215, 20);
-    private static final Color FG       = new Color(220, 220, 220);
+    private static final Color BG = new Color(30, 26, 22);
+    private static final Color ACCENT = new Color(255, 215, 20);
+    private static final Color FG = new Color(220, 220, 220);
     private static final Color PANEL_BG = new Color(20, 16, 12);
-    private static final Font  TITLE    = new Font("Monospaced", Font.BOLD, 38);
-    private static final Font  HEADER   = new Font("Monospaced", Font.BOLD, 16);
-    private static final Font  BODY     = new Font("Monospaced", Font.PLAIN, 14);
+    private static final Font TITLE = new Font("Monospaced", Font.BOLD, 38);
+    private static final Font HEADER = new Font("Monospaced", Font.BOLD, 16);
+    private static final Font BODY = new Font("Monospaced", Font.PLAIN, 14);
 
     private static final Color[] TEAM_COLORS = {
-        new Color(220, 60, 60),   // RED
-        new Color(60, 80, 220),   // BLUE
-        new Color(50, 180, 50),   // GREEN
-        new Color(200, 180, 0),   // YELLOW
+        new Color(220, 60, 60), // RED
+        new Color(60, 80, 220), // BLUE
+        new Color(50, 180, 50), // GREEN
+        new Color(200, 180, 0), // YELLOW
     };
     private static final String[] TEAM_NAMES = { "RED", "BLUE", "GREEN", "YELLOW" };
 
@@ -92,18 +92,18 @@ public class LobbyPanel extends JPanel {
             rebuildGrid(teamCount, players);
 
             int current = players.size();
-            int needed  = msg.minPlayers != null ? msg.minPlayers : teamCount * 2;
+            int needed = msg.minPlayers != null ? msg.minPlayers : teamCount * 2;
             int missing = Math.max(0, needed - current);
 
             if ("STARTING".equals(msg.status)) {
                 countLabel.setText("Starting game...");
                 countLabel.setForeground(new Color(100, 255, 100));
             } else {
-                countLabel.setText(current + " / " + needed + " players  — Need " + missing + " more");
+                countLabel.setText(current + " / " + needed + " players — Need " + missing + " more");
                 countLabel.setForeground(FG);
             }
-            statusLabel.setText(teamCount + " teams  |  min " + (teamCount * 2)
-                    + " players  |  max " + (teamCount * 3) + " players");
+            statusLabel.setText(teamCount + " teams | min " + (teamCount * 2)
+                    + " players | max " + (teamCount * 3) + " players");
         });
     }
 
@@ -113,7 +113,7 @@ public class LobbyPanel extends JPanel {
 
         for (int i = 0; i < tc; i++) {
             String tName = TEAM_NAMES[i];
-            Color  tColor = TEAM_COLORS[i];
+            Color tColor = TEAM_COLORS[i];
 
             JPanel col = new JPanel();
             col.setBackground(PANEL_BG);
@@ -133,7 +133,7 @@ public class LobbyPanel extends JPanel {
                 if (tName.equals(lp.team)) {
                     teamPlayers++;
                     boolean isLocal = localPlayerId.equals(lp.playerId);
-                    String display = isLocal ? "► " + lp.playerId : "  " + lp.playerId;
+                    String display = isLocal ? "► " + lp.playerId : " " + lp.playerId;
                     JLabel pl = new JLabel(display);
                     pl.setFont(BODY);
                     pl.setForeground(isLocal ? ACCENT : FG);
@@ -144,7 +144,7 @@ public class LobbyPanel extends JPanel {
 
             // Empty slots
             for (int s = teamPlayers; s < 3; s++) {
-                JLabel empty = new JLabel("  [empty]");
+                JLabel empty = new JLabel(" [empty]");
                 empty.setFont(BODY);
                 empty.setForeground(new Color(80, 80, 100));
                 empty.setAlignmentX(Component.LEFT_ALIGNMENT);
