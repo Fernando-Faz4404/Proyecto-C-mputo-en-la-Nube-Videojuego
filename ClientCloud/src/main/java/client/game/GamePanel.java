@@ -563,15 +563,40 @@ public class GamePanel extends JPanel implements Runnable {
         int ts = GameMap.TILE_SIZE;
         int cols = gameMap.getCols();
         int rows = gameMap.getRows();
-        int hash = Math.abs(playerId.hashCode());
-        int dc = hash % 3;
-        int dr = (hash / 3) % 2;
-        return switch (team) {
-            case RED    -> new double[]{ (3 + dc) * ts, (2 + dr) * ts };
-            case BLUE   -> new double[]{ (cols - 4 - dc) * ts, (2 + dr) * ts };
-            case GREEN  -> new double[]{ (3 + dc) * ts, (rows - 3 - dr) * ts };
-            case YELLOW -> new double[]{ (cols - 4 - dc) * ts, (rows - 3 - dr) * ts };
-        };
+
+        int baseC, baseR, stepC, stepR;
+        if(team == Team.RED){ baseC = 2;        baseR = 2;        stepC =  1; stepR =  1; }
+        else if (team == Team.BLUE){ baseC = cols - 3; baseR = 2;        stepC = -1; stepR =  1; }
+        else if (team == Team.GREEN)  { baseC = 2;        baseR = rows - 3; stepC =  1; stepR = -1; }
+        else{ baseC = cols - 3; baseR = rows - 3; stepC = -1; stepR = -1; }
+
+        List<int[]> candidates = new ArrayList<>();
+        for (int dr = 0; dr < 6; dr++) {
+            for (int dc = 0; dc < 6; dc++) {
+                int c = baseC + dc * stepC;
+                int r = baseR + dr * stepR;
+                if (c < 1 || c >= cols - 1 || r < 1 || r >= rows - 1) continue;
+                if (isOpenForSpawn(c, r)) candidates.add(new int[]{c, r});
+            }
+        }
+
+        if (candidates.isEmpty()) {
+            return new double[]{ cols / 2.0 * ts, rows / 2.0 * ts };
+        }
+
+        int idx = Math.abs(playerId.hashCode()) % candidates.size();
+        int[] pos = candidates.get(idx);
+        return new double[]{ pos[0] * ts + ts / 2.0, pos[1] * ts + ts / 2.0 };
+    }
+
+    private boolean isOpenForSpawn(int col, int row) {
+        int ts = GameMap.TILE_SIZE;
+        double h = ts / 2.0;
+        return !gameMap.isSolid(col * ts + h, row * ts + h)
+            && !gameMap.isSolid((col - 1) * ts + h, row * ts + h)
+            && !gameMap.isSolid((col + 1) * ts + h, row * ts + h)
+            && !gameMap.isSolid(col * ts + h, (row - 1) * ts + h)
+            && !gameMap.isSolid(col * ts + h, (row + 1) * ts + h);
     }
 
     // ---- Power-up effects ----

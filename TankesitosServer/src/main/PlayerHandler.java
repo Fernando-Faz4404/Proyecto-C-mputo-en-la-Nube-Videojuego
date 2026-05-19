@@ -180,7 +180,6 @@ public class PlayerHandler implements Runnable {
         System.out.println("[Server] Round " + doneRound + " ended. Winner: " + winner);
 
         if (moreRounds) {
-            // Reset alive/health for next round
             for (PlayerHandler ph : playerHandlers) { ph.alive = true; ph.health = 100; }
             redScore.set(0); blueScore.set(0); greenScore.set(0); yellowScore.set(0);
             collectedThisBatch.clear();
@@ -202,6 +201,7 @@ public class PlayerHandler implements Runnable {
         } else {
             System.out.println("[Server] Game over. Round wins — RED:" + wins[0]
                     + " BLUE:" + wins[1] + " GREEN:" + wins[2] + " YELLOW:" + wins[3]);
+            forceDisconnectAll();
         }
     }
 
@@ -347,6 +347,17 @@ public class PlayerHandler implements Runnable {
     private void writeUTF(String msg) throws IOException {
         dos.writeUTF(msg);
         dos.flush();
+    }
+
+    private static void forceDisconnectAll() {
+        List<PlayerHandler> snapshot = new ArrayList<>(playerHandlers);
+        playerHandlers.clear();
+        for (PlayerHandler ph : snapshot) ph.closeQuietly();
+        lobby.reset();
+        redScore.set(0); blueScore.set(0); greenScore.set(0); yellowScore.set(0);
+        collectedThisBatch.clear();
+        respawnBatchCount.set(0);
+        System.out.println("[Server] Game over. Lobby reset and ready.");
     }
 
     private void disconnect() {
