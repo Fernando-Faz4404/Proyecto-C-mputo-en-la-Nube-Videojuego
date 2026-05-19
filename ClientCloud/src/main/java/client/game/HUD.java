@@ -217,7 +217,7 @@ public class HUD {
 
     // ── Death screen ─────────────────────────────────────────────────────────
 
-    public void drawDeathScreen(Graphics2D g2, int viewW, int viewH) {
+    public void drawDeathScreen(Graphics2D g2, int viewW, int viewH, int respawnsLeft) {
         g2.setColor(new Color(0, 0, 0, 120));
         g2.fillRect(0, 0, viewW, viewH);
         g2.setFont(FONT_TITLE);
@@ -227,7 +227,9 @@ public class HUD {
         g2.drawString(msg, viewW / 2 - w / 2, viewH / 2 - 10);
         g2.setFont(FONT_LARGE);
         g2.setColor(Color.WHITE);
-        String sub = "Presiona R para reaparecer";
+        String sub = respawnsLeft > 0
+                ? "Presiona R para reaparecer  (" + respawnsLeft + " restantes)"
+                : "Sin reapariciones";
         int w2 = g2.getFontMetrics().stringWidth(sub);
         g2.drawString(sub, viewW / 2 - w2 / 2, viewH / 2 + 32);
     }

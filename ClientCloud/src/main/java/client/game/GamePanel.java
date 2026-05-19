@@ -55,6 +55,7 @@ public class GamePanel extends JPanel implements Runnable {
     private String roundWinnerTeam = null;
 
     private final int teamCount;
+    private final String mapResource;
     private Thread gameThread;
     private final NetworkClient net;
     private final boolean testMode;
@@ -68,6 +69,7 @@ public class GamePanel extends JPanel implements Runnable {
     private long gameSeed = 0;
 
     private int frameCount = 0;
+    private int respawnsLeft = 2;
 
     // Used to fire N-key round advance only once per press
     private boolean lastNextRound = false;
@@ -79,10 +81,12 @@ public class GamePanel extends JPanel implements Runnable {
     public GamePanel(String playerName, Team team, String mapResource,
                      int teamCount, long seed, NetworkClient net) {
         this.teamCount = teamCount;
+        this.mapResource = mapResource;
         this.net = net;
         this.testMode = (net == null);
 
         AssetLoader.get().load();
+        SoundManager.get().loadAll();
         gameMap.load(mapResource);
 
         setPreferredSize(new Dimension(VIEW_W, VIEW_H));
@@ -91,7 +95,7 @@ public class GamePanel extends JPanel implements Runnable {
         addKeyListener(keyHandler);
         setFocusable(true);
 
-        double[] spawn = spawnPosition(team, teamCount);
+        double[] spawn = spawnPosition(team, teamCount, playerName);
         localTank = new Tank(playerName, team, spawn[0], spawn[1]);
 
         this.gameSeed = seed;
@@ -179,6 +183,7 @@ public class GamePanel extends JPanel implements Runnable {
     // ---- Game loop ----
 
     public void startGame() {
+        SoundManager.get().playBgm(mapResource);
         gameThread = new Thread(this, "GameLoop");
         gameThread.setDaemon(true);
         gameThread.start();
@@ -230,10 +235,10 @@ public class GamePanel extends JPanel implements Runnable {
             return;
         }
 
-        // Respawn
-        if (!localTank.isAlive() && keyHandler.respawn) {
-            double[] sp = spawnPosition(localTank.getTeam(), teamCount);
+        if (!localTank.isAlive() && keyHandler.respawn && respawnsLeft > 0) {
+            double[] sp = spawnPosition(localTank.getTeam(), teamCount, localTank.getPlayerId());
             localTank.respawn(sp[0], sp[1]);
+            respawnsLeft--;
             if (net != null) net.send(
                     GameMessage.move(localTank.getPlayerId(), localTank.getTeam().name(),
                             localTank.getX(), localTank.getY(), localTank.getAngle(),
@@ -255,6 +260,7 @@ public class GamePanel extends JPanel implements Runnable {
             if (keyHandler.shoot) {
                 Bullet b = localTank.shoot();
                 if (b != null) {
+                    SoundManager.get().play("shoot");
                     synchronized (bullets) { bullets.add(b); }
                     if (net != null) net.send(GameMessage.shoot(
                             b.getOwnerId(), b.getOwnerTeam().name(),
@@ -269,6 +275,9 @@ public class GamePanel extends JPanel implements Runnable {
                         localTank.getHealth(), localTank.isAlive()));
             }
         }
+
+        SoundManager.get().setEngine(localTank.isAlive() && !roundOver
+                && (keyHandler.up || keyHandler.down || keyHandler.left || keyHandler.right));
 
         if (net != null && localTank.isAlive() && !roundOver
                 && (frameCount == 1 || frameCount % 60 == 0)) {
@@ -303,6 +312,7 @@ public class GamePanel extends JPanel implements Runnable {
                 if (!b.isActive()) { it.remove(); continue; }
 
                 if (gameMap.isSolid(b.getX(), b.getY())) {
+                    SoundManager.get().play("hit_wall");
                     explosions.add(new Explosion(b.getX(), b.getY()));
                     it.remove(); continue;
                 }
@@ -310,8 +320,12 @@ public class GamePanel extends JPanel implements Runnable {
                 if (b.getOwnerTeam() != localTank.getTeam() && localTank.isAlive()
                         && localTank.getBounds().intersects(b.getBounds().getBounds2D())) {
                     localTank.takeDamage(Bullet.DAMAGE);
+                    SoundManager.get().play("damaged");
                     explosions.add(new Explosion(b.getX(), b.getY()));
                     if (!localTank.isAlive()) {
+                        SoundManager.get().play("death");
+                        SoundManager.get().play("explosion");
+                        SoundManager.get().setEngine(false);
                         explosions.add(new Explosion(localTank.getX(), localTank.getY()));
                         if (net != null) net.send(GameMessage.death(localTank.getPlayerId()));
                     } else {
@@ -328,8 +342,10 @@ public class GamePanel extends JPanel implements Runnable {
                     if (!remote.isAlive() || b.getOwnerTeam() == remote.getTeam()) continue;
                     if (remote.getBounds().intersects(b.getBounds().getBounds2D())) {
                         remote.takeDamage(Bullet.DAMAGE);
+                        SoundManager.get().play("hit_tank");
                         explosions.add(new Explosion(b.getX(), b.getY()));
                         if (!remote.isAlive()) {
+                            SoundManager.get().play("explosion");
                             explosions.add(new Explosion(remote.getX(), remote.getY()));
                             if (b.getOwnerId().equals(localTank.getPlayerId()))
                                 localTank.addScore(1);
@@ -374,7 +390,7 @@ public class GamePanel extends JPanel implements Runnable {
                 teamCount, currentRound, TOTAL_ROUNDS,
                 VIEW_W, VIEW_H, speedUntil, immunityUntil, ammoUntil);
 
-        if (!localTank.isAlive() && !roundOver) hud.drawDeathScreen(g2, VIEW_W, VIEW_H);
+        if (!localTank.isAlive() && !roundOver) hud.drawDeathScreen(g2, VIEW_W, VIEW_H, respawnsLeft);
 
         if (roundOver) drawInterRoundOverlay(g2);
 
@@ -503,8 +519,9 @@ public class GamePanel extends JPanel implements Runnable {
     private void resetForRound(int round, String mapResource, long seed) {
         currentRound = round;
         gameMap.load(mapResource);
+        SoundManager.get().playBgm(mapResource);
 
-        double[] sp = spawnPosition(localTank.getTeam(), teamCount);
+        double[] sp = spawnPosition(localTank.getTeam(), teamCount, localTank.getPlayerId());
         localTank.respawn(sp[0], sp[1]);
         speedUntil = immunityUntil = ammoUntil = 0;
 
@@ -523,12 +540,12 @@ public class GamePanel extends JPanel implements Runnable {
         roundOver = false;
         roundWinnerTeam = null;
         frameCount = 0;
+        respawnsLeft = 2;
     }
 
     // ---- Test-mode round end simulation ----
 
     private void simulateRoundEnd() {
-        // Award the round to the local player's team
         switch (localTank.getTeam()) {
             case RED -> redWins++;
             case BLUE -> blueWins++;
@@ -542,15 +559,18 @@ public class GamePanel extends JPanel implements Runnable {
 
     // ---- Spawn positions ----
 
-    private double[] spawnPosition(Team team, int tc) {
+    private double[] spawnPosition(Team team, int tc, String playerId) {
         int ts = GameMap.TILE_SIZE;
         int cols = gameMap.getCols();
         int rows = gameMap.getRows();
+        int hash = Math.abs(playerId.hashCode());
+        int dc = hash % 3;
+        int dr = (hash / 3) % 2;
         return switch (team) {
-            case RED -> new double[]{ 3 * ts, 2 * ts };
-            case BLUE -> new double[]{ (cols - 4) * ts, 2 * ts };
-            case GREEN -> new double[]{ 3 * ts, (rows - 3) * ts };
-            case YELLOW -> new double[]{ (cols - 4) * ts, (rows - 3) * ts };
+            case RED    -> new double[]{ (3 + dc) * ts, (2 + dr) * ts };
+            case BLUE   -> new double[]{ (cols - 4 - dc) * ts, (2 + dr) * ts };
+            case GREEN  -> new double[]{ (3 + dc) * ts, (rows - 3 - dr) * ts };
+            case YELLOW -> new double[]{ (cols - 4 - dc) * ts, (rows - 3 - dr) * ts };
         };
     }
 
@@ -559,10 +579,10 @@ public class GamePanel extends JPanel implements Runnable {
     private void applyPowerUp(PowerUp.Type type) {
         long now = System.currentTimeMillis();
         switch (type) {
-            case SPEED -> speedUntil = now + 5_000;
-            case IMMUNITY -> immunityUntil = now + 4_000;
-            case AMMO -> ammoUntil = now + 8_000;
-            case HEALTH -> localTank.addHealth(40);
+            case SPEED    -> { speedUntil    = now + 5_000; SoundManager.get().play("powerup_speed");    }
+            case IMMUNITY -> { immunityUntil = now + 4_000; SoundManager.get().play("powerup_immunity"); }
+            case AMMO     -> { ammoUntil     = now + 8_000; SoundManager.get().play("powerup_ammo");     }
+            case HEALTH   -> { localTank.addHealth(40);     SoundManager.get().play("powerup_health");   }
         }
     }
 
@@ -633,6 +653,7 @@ public class GamePanel extends JPanel implements Runnable {
         redWins = rw; blueWins = bw;
         greenWins = gw; yellowWins = yw;
         roundOver = true;
+        SoundManager.get().setEngine(false);
         if (round >= total) gameOver = true;
     }
 

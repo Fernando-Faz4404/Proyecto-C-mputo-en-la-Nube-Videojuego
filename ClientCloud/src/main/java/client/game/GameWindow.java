@@ -38,6 +38,10 @@ public class GameWindow extends JFrame implements NetworkClient.EventListener {
     // ---- Panel switching ----
 
     private void showMainMenu() {
+        SoundManager.get().loadAll();
+        SoundManager.get().setEngine(false);
+        SoundManager.get().stopBgm();
+        SoundManager.get().playMenuMusic();
         setContentPane(new MainMenuPanel(this::onJoinClicked, this::onTestMode));
         pack();
         setMinimumSize(new Dimension(900, 640));

@@ -356,6 +356,13 @@ public class PlayerHandler implements Runnable {
 
         if (playerId != null) {
             broadcastAll(gson.toJson(JSON_GameMessage.disconnect(playerId)));
+            if (playerHandlers.isEmpty() && lobby.getState() == GameLobby.State.IN_GAME) {
+                lobby.reset();
+                redScore.set(0); blueScore.set(0); greenScore.set(0); yellowScore.set(0);
+                collectedThisBatch.clear();
+                respawnBatchCount.set(0);
+                System.out.println("[Server] All players left. Lobby reset.");
+            }
             evaluateAutoStart();
         }
         closeQuietly();

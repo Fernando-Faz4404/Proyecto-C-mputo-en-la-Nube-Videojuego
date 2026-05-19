@@ -226,7 +226,7 @@ public class MainMenuPanel extends JPanel {
         g2.setFont(F_SMALL);
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
                 RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
-        drawShadowText(g2, "Tank Wars 2025 — Proyecto Cómputo en la Nube",
+        drawShadowText(g2, "Tank Wars 2026 — Proyecto Cómputo en la Nube",
                 8, h - 8, TEXT_GRAY, Color.BLACK, 1);
     }
 
