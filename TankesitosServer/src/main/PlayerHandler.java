@@ -334,11 +334,13 @@ public class PlayerHandler implements Runnable {
     }
 
     private static void sendTo(PlayerHandler ph, String msg) {
-        try {
-            ph.dos.writeUTF(msg);
-            ph.dos.flush();
-        } catch (IOException e) {
-            ph.disconnect();
+        synchronized (ph.dos) {
+            try {
+                ph.dos.writeUTF(msg);
+                ph.dos.flush();
+            } catch (IOException e) {
+                ph.disconnect();
+            }
         }
     }
 

@@ -67,6 +67,8 @@ public class GamePanel extends JPanel implements Runnable {
 
     private long gameSeed = 0;
 
+    private int frameCount = 0;
+
     // Used to fire N-key round advance only once per press
     private boolean lastNextRound = false;
 
@@ -199,6 +201,8 @@ public class GamePanel extends JPanel implements Runnable {
     // ---- Update ----
 
     private void update() {
+        frameCount++;
+
         // In test mode: N key ends the current round (simulate) or advances to next
         boolean nPressed = keyHandler.nextRound && !lastNextRound;
         lastNextRound = keyHandler.nextRound;
@@ -264,6 +268,13 @@ public class GamePanel extends JPanel implements Runnable {
                         localTank.getX(), localTank.getY(), localTank.getAngle(),
                         localTank.getHealth(), localTank.isAlive()));
             }
+        }
+
+        if (net != null && localTank.isAlive() && !roundOver
+                && (frameCount == 1 || frameCount % 60 == 0)) {
+            net.send(GameMessage.move(localTank.getPlayerId(), localTank.getTeam().name(),
+                    localTank.getX(), localTank.getY(), localTank.getAngle(),
+                    localTank.getHealth(), true));
         }
 
         // Power-up timers
@@ -511,6 +522,7 @@ public class GamePanel extends JPanel implements Runnable {
         redScore = blueScore = greenScore = yellowScore = 0;
         roundOver = false;
         roundWinnerTeam = null;
+        frameCount = 0;
     }
 
     // ---- Test-mode round end simulation ----
@@ -567,7 +579,7 @@ public class GamePanel extends JPanel implements Runnable {
     private boolean collidesWithTanks(Tank tank) {
         Rectangle2D bounds = tank.getBounds();
         for (Tank r : remoteTanks.values()) {
-            if (r.isAlive() && bounds.intersects(r.getBounds())) return true;
+            if (r.isAlive() && r.getTeam() != tank.getTeam() && bounds.intersects(r.getBounds())) return true;
         }
         return false;
     }

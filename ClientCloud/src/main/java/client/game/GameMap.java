@@ -6,11 +6,7 @@ import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Tile-based game map loaded from a .txt resource file via {@link AssetLoader}.
- * Tile IDs: 0=grass, 1=wall, 2=water, 3=sand.
- * Walls (1) and water (2) are solid.
- */
+
 public class GameMap {
 
     public static final int TILE_SIZE = 48;

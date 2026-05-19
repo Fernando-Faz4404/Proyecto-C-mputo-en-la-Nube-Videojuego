@@ -97,7 +97,8 @@ public class NetworkClient {
                 System.out.println("Disconnected from server.");
                 connected = false;
             } catch (Exception e) {
-                System.err.println("Message error: " + e.getMessage());
+                System.err.println("Stream error (disconnecting): " + e.getMessage());
+                connected = false;
             }
         }
     }
