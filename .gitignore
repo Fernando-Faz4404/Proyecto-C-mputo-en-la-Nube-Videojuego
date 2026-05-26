@@ -23,12 +23,12 @@ out/
 .classpath
 .project
 .factorypath
-nbproject/
-nbbuild/
 dist/
 nbdist/
 .nb-gradle/
-build/
+**/nbproject/private/
+**/nbproject/build-impl.xml
+**/build
 
 # --- ENVIRONMENT & SECRETS ---
 .env
@@ -38,3 +38,6 @@ build/
 # --- OS ---
 .DS_Store
 Thumbs.db
+
+# Archivos compilados de Java
+*.class

@@ -75,7 +75,7 @@ public class GameWindow extends JFrame implements NetworkClient.EventListener {
         this.assignedTeam = "RED"; // will be overridden by server
 
         // Create network client
-        String serverIp = loadEnvOrDefault("SERVER_IP", "192.168.1.222");
+        String serverIp = loadEnvOrDefault("SERVER_IP", "localhost");
         int serverPort = Integer.parseInt(loadEnvOrDefault("SERVER_PORT", "2555"));
 
         net = new NetworkClient(serverIp, serverPort);
