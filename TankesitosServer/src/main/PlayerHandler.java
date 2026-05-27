@@ -4,43 +4,53 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import json.JSON_GameMessage;
+import org.java_websocket.WebSocket;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
-public class PlayerHandler implements Runnable {
+/**
+ * Maneja la lógica de cada jugador conectado vía WebSocket.
+ * Se eliminó Runnable/run() y el I/O TCP raw (Socket, DataInputStream, DataOutputStream).
+ * Toda la E/S se hace a través de {@link WebSocket#send(String)}.
+ */
+public class PlayerHandler {
+
+    // ---- Estado estático compartido ----
 
     public static final CopyOnWriteArrayList<PlayerHandler> playerHandlers = new CopyOnWriteArrayList<>();
     public static final GameLobby lobby = new GameLobby();
 
+    /** Mapa conexión WebSocket → handler del jugador. */
+    public static final ConcurrentHashMap<WebSocket, PlayerHandler> connMap = new ConcurrentHashMap<>();
+
     private static final AtomicInteger numPlayers = new AtomicInteger(1);
-    private static final AtomicInteger redScore = new AtomicInteger(0);
-    private static final AtomicInteger blueScore = new AtomicInteger(0);
+    private static final AtomicInteger redScore   = new AtomicInteger(0);
+    private static final AtomicInteger blueScore  = new AtomicInteger(0);
     private static final AtomicInteger greenScore = new AtomicInteger(0);
-    private static final AtomicInteger yellowScore = new AtomicInteger(0);
+    private static final AtomicInteger yellowScore= new AtomicInteger(0);
+
     private static volatile long gameSeed = 0;
     private static final int START_DELAY_SECONDS = 10;
     private static volatile long startDeadlineMs = 0;
     private static volatile Thread startCountdownThread;
 
-    // Power-up respawn tracking (server is the authority)
+    // Seguimiento de recogida de power-ups (autoridad en el servidor)
     private static final java.util.Set<Integer> collectedThisBatch =
             java.util.Collections.synchronizedSet(new java.util.HashSet<>());
     private static final AtomicInteger respawnBatchCount = new AtomicInteger(0);
 
+    // ---- Estado por jugador ----
+
     private final int internalId;
     private final Gson gson = new Gson();
-    private java.net.Socket socket;
-    private DataOutputStream dos;
-    private DataInputStream dis;
+    private final org.java_websocket.WebSocket conn;
 
     private String playerId;
     private String team;
@@ -48,69 +58,90 @@ public class PlayerHandler implements Runnable {
     private int health = 100;
     private boolean alive = true;
 
-    public PlayerHandler(java.net.Socket socket) {
-        this.socket = socket;
+    // ---- Constructor ----
+
+    /**
+     * Solo guarda la conexión e id interno. No realiza I/O.
+     * La inicialización real del jugador ocurre en {@link #onMessage}.
+     */
+    public PlayerHandler(WebSocket conn) {
+        this.conn = conn;
         this.internalId = numPlayers.getAndIncrement();
-        try {
-            this.dos = new DataOutputStream(socket.getOutputStream());
-            this.dis = new DataInputStream(socket.getInputStream());
-
-            // Read JOIN message
-            String joinJson = dis.readUTF();
-            JsonObject jo = JsonParser.parseString(joinJson).getAsJsonObject();
-            this.playerId = jo.has("playerId") ? jo.get("playerId").getAsString()
-                                                 : "Player" + internalId;
-            int prefTeams = jo.has("teamCount") ? jo.get("teamCount").getAsInt() : 2;
-
-            String assignedTeam = lobby.addPlayer(playerId, prefTeams);
-            if (assignedTeam == null) {
-                // Lobby full — reject
-                writeUTF("{\"type\":\"DISCONNECT\",\"playerId\":\"" + playerId + "\"}");
-                closeQuietly();
-                return;
-            }
-            this.team = assignedTeam;
-
-            playerHandlers.add(this);
-            System.out.println("[Lobby] " + playerId + " joined as " + team
-                    + " (" + lobby.getCurrentPlayers() + "/" + lobby.getMaxPlayers() + ")");
-
-            // Send current lobby state to the new player
-            sendTo(this, gson.toJson(buildLobbyState()));
-
-            // Notify others of updated lobby
-            broadcastAll(gson.toJson(buildLobbyState()));
-
-            // Auto-start with delay when minimum per team is met
-            evaluateAutoStart();
-
-        } catch (IOException e) {
-            closeQuietly();
-        }
     }
 
-    @Override
-    public void run() {
-        while (socket != null && socket.isConnected()) {
+    // ---- Puntos de entrada estáticos (llamados desde WsServer) ----
+
+    /**
+     * Llamado por WsServer cuando llega un mensaje de texto.
+     * Si la conexión no está en connMap aún, procesa el JOIN y crea el handler.
+     * Si ya existe, delega a handleMessage().
+     */
+    public static void onMessage(WebSocket conn, String json) {
+        PlayerHandler ph = connMap.get(conn);
+
+        if (ph == null) {
+            // Primera vez: debe ser mensaje JOIN
+            PlayerHandler newPh = new PlayerHandler(conn);
             try {
-                String msg = dis.readUTF();
-                if (msg != null) handleMessage(msg);
-            } catch (IOException e) {
-                break;
+                JsonObject jo = JsonParser.parseString(json).getAsJsonObject();
+                newPh.playerId = jo.has("playerId")
+                        ? jo.get("playerId").getAsString()
+                        : "Player" + newPh.internalId;
+                int prefTeams = jo.has("teamCount") ? jo.get("teamCount").getAsInt() : 2;
+
+                String assignedTeam = lobby.addPlayer(newPh.playerId, prefTeams);
+                if (assignedTeam == null) {
+                    // Lobby lleno — rechazar
+                    conn.send("{\"type\":\"DISCONNECT\",\"playerId\":\"" + newPh.playerId + "\"}");
+                    conn.close();
+                    return;
+                }
+                newPh.team = assignedTeam;
+
+                connMap.put(conn, newPh);
+                playerHandlers.add(newPh);
+                System.out.println("[Lobby] " + newPh.playerId + " joined as " + newPh.team
+                        + " (" + lobby.getCurrentPlayers() + "/" + lobby.getMaxPlayers() + ")");
+
+                // Enviar estado actual del lobby al nuevo jugador
+                sendTo(newPh, new Gson().toJson(buildLobbyState()));
+
+                // Notificar a los demás del lobby actualizado
+                broadcastAll(new Gson().toJson(buildLobbyState()));
+
+                // Auto-start cuando se alcanza el mínimo por equipo
+                evaluateAutoStart();
+
+            } catch (Exception e) {
+                System.err.println("[PlayerHandler] Error en JOIN: " + e.getMessage());
+                conn.close();
             }
+
+        } else {
+            // Jugador ya registrado: procesar mensaje normal
+            ph.handleMessage(json);
         }
-        disconnect();
     }
 
-    // ---- Message handling ----
+    /**
+     * Llamado por WsServer cuando una conexión se cierra.
+     */
+    public static void onClose(WebSocket conn) {
+        PlayerHandler ph = connMap.remove(conn);
+        if (ph != null) {
+            ph.disconnect();
+        }
+    }
 
-    private void handleMessage(String json) {
+    // ---- Manejo de mensajes ----
+
+    public void handleMessage(String json) {
         try {
             JsonObject jo = JsonParser.parseString(json).getAsJsonObject();
             String type = jo.get("type").getAsString();
 
             switch (type) {
-                case "MOVE" -> {
+                case "MOVE": {
                     JSON_GameMessage d = gson.fromJson(json, JSON_GameMessage.class);
                     if (d.x != null) posX = d.x;
                     if (d.y != null) posY = d.y;
@@ -118,18 +149,21 @@ public class PlayerHandler implements Runnable {
                     if (d.health != null) health = d.health;
                     if (d.alive != null) alive = d.alive;
                     broadcastOthers(json);
+                    break;
                 }
-                case "SHOOT" -> broadcastOthers(json);
-                case "DEATH" -> {
+                case "SHOOT":
+                    broadcastOthers(json);
+                    break;
+                case "DEATH": {
                     alive = false;
                     health = 0;
                     incrementOpponentScore();
                     broadcastOthers(json);
                     checkRoundEnd();
+                    break;
                 }
-                case "POWERUP_COLLECTED" -> {
+                case "POWERUP_COLLECTED": {
                     broadcastOthers(json);
-                    // Server tracks unique collections per batch and triggers respawn
                     if (jo.has("powerUpIndex")) {
                         int idx = jo.get("powerUpIndex").getAsInt();
                         boolean isNew = collectedThisBatch.add(idx);
@@ -142,8 +176,10 @@ public class PlayerHandler implements Runnable {
                             System.out.println("[Server] PowerUp respawn batch " + batch);
                         }
                     }
+                    break;
                 }
-                default -> {}
+                default:
+                    break;
             }
         } catch (Exception e) {
             System.err.println("handleMessage error: " + e.getMessage());
@@ -153,7 +189,6 @@ public class PlayerHandler implements Runnable {
     private static synchronized void checkRoundEnd() {
         if (lobby.getState() != GameLobby.State.IN_GAME) return;
 
-        // Build a map of team → hasAlivePlayer for all active teams
         String[] allTeams = { "RED", "BLUE", "GREEN", "YELLOW" };
         Map<String, Boolean> teamAlive = new LinkedHashMap<>();
         for (int i = 0; i < lobby.getTeamCount(); i++) teamAlive.put(allTeams[i], false);
@@ -167,7 +202,7 @@ public class PlayerHandler implements Runnable {
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toList());
 
-        if (survivors.size() > 1) return; // round still ongoing
+        if (survivors.size() > 1) return;
 
         String winner = survivors.isEmpty() ? "DRAW" : survivors.get(0);
         boolean moreRounds = lobby.advanceRound(winner);
@@ -210,17 +245,16 @@ public class PlayerHandler implements Runnable {
         int r = redScore.get(), b = blueScore.get(),
             g = greenScore.get(), y = yellowScore.get();
         switch (team) {
-            case "RED" -> b = blueScore.incrementAndGet();
-            case "BLUE" -> r = redScore.incrementAndGet();
-            case "GREEN" -> y = yellowScore.incrementAndGet();
-            case "YELLOW" -> g = greenScore.incrementAndGet();
+            case "RED":    b = blueScore.incrementAndGet();   break;
+            case "BLUE":   r = redScore.incrementAndGet();    break;
+            case "GREEN":  y = yellowScore.incrementAndGet(); break;
+            case "YELLOW": g = greenScore.incrementAndGet();  break;
         }
-        String scoreJson = gson.toJson(
-                JSON_GameMessage.scoreUpdate(r, b, g, y));
+        String scoreJson = gson.toJson(JSON_GameMessage.scoreUpdate(r, b, g, y));
         broadcastAll(scoreJson);
     }
 
-    // ---- Lobby helpers ----
+    // ---- Helpers de lobby ----
 
     private static synchronized void launchGame() {
         if (lobby.getState() == GameLobby.State.IN_GAME) return;
@@ -264,13 +298,11 @@ public class PlayerHandler implements Runnable {
             cancelStartCountdownLocked();
             return;
         }
-
         if (!lobby.isReadyToStart()) {
             cancelStartCountdownLocked();
             broadcastAll(new Gson().toJson(buildLobbyState()));
             return;
         }
-
         if (startDeadlineMs == 0) {
             startDeadlineMs = System.currentTimeMillis() + (START_DELAY_SECONDS * 1000L);
             startCountdownThread = new Thread(PlayerHandler::runStartCountdown, "LobbyStartCountdown");
@@ -278,38 +310,32 @@ public class PlayerHandler implements Runnable {
             startCountdownThread.start();
             System.out.println("[Lobby] Minimum reached. Starting in " + START_DELAY_SECONDS + "s...");
         }
-
         broadcastAll(new Gson().toJson(buildLobbyState()));
     }
 
     private static void runStartCountdown() {
         while (true) {
             synchronized (PlayerHandler.class) {
-                if (startDeadlineMs == 0 || lobby.getState() == GameLobby.State.IN_GAME || !lobby.isReadyToStart()) {
+                if (startDeadlineMs == 0
+                        || lobby.getState() == GameLobby.State.IN_GAME
+                        || !lobby.isReadyToStart()) {
                     startCountdownThread = null;
                     return;
                 }
-                if (System.currentTimeMillis() >= startDeadlineMs) {
-                    break;
-                }
+                if (System.currentTimeMillis() >= startDeadlineMs) break;
             }
-
             broadcastAll(new Gson().toJson(buildLobbyState()));
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException ignored) {
-                return;
-            }
+            try { Thread.sleep(1000); } catch (InterruptedException ignored) { return; }
         }
 
         synchronized (PlayerHandler.class) {
             startCountdownThread = null;
-            if (startDeadlineMs == 0 || !lobby.isReadyToStart() || lobby.getState() == GameLobby.State.IN_GAME) {
+            if (startDeadlineMs == 0 || !lobby.isReadyToStart()
+                    || lobby.getState() == GameLobby.State.IN_GAME) {
                 return;
             }
             startDeadlineMs = 0;
         }
-
         launchGame();
     }
 
@@ -317,12 +343,10 @@ public class PlayerHandler implements Runnable {
         startDeadlineMs = 0;
         Thread t = startCountdownThread;
         startCountdownThread = null;
-        if (t != null && t != Thread.currentThread()) {
-            t.interrupt();
-        }
+        if (t != null && t != Thread.currentThread()) t.interrupt();
     }
 
-    // ---- Network helpers ----
+    // ---- Helpers de red ----
 
     private static void broadcastAll(String msg) {
         for (PlayerHandler ph : playerHandlers) sendTo(ph, msg);
@@ -335,25 +359,28 @@ public class PlayerHandler implements Runnable {
     }
 
     private static void sendTo(PlayerHandler ph, String msg) {
-        synchronized (ph.dos) {
-            try {
-                ph.dos.writeUTF(msg);
-                ph.dos.flush();
-            } catch (IOException e) {
-                ph.disconnect();
-            }
+        try {
+            ph.conn.send(msg);
+        } catch (Exception e) {
+            ph.disconnect();
         }
     }
 
-    private void writeUTF(String msg) throws IOException {
-        dos.writeUTF(msg);
-        dos.flush();
+    private void writeUTF(String msg) {
+        try {
+            conn.send(msg);
+        } catch (Exception e) {
+            System.err.println("writeUTF error: " + e.getMessage());
+        }
     }
 
     private static void forceDisconnectAll() {
         List<PlayerHandler> snapshot = new ArrayList<>(playerHandlers);
         playerHandlers.clear();
-        for (PlayerHandler ph : snapshot) ph.closeQuietly();
+        connMap.clear();
+        for (PlayerHandler ph : snapshot) {
+            try { ph.conn.close(); } catch (Exception ignored) {}
+        }
         lobby.reset();
         redScore.set(0); blueScore.set(0); greenScore.set(0); yellowScore.set(0);
         collectedThisBatch.clear();
@@ -377,12 +404,5 @@ public class PlayerHandler implements Runnable {
             }
             evaluateAutoStart();
         }
-        closeQuietly();
-    }
-
-    private void closeQuietly() {
-        try { if (socket != null) socket.close(); } catch (IOException ignored) {}
-        try { if (dis != null) dis.close(); } catch (IOException ignored) {}
-        try { if (dos != null) dos.close(); } catch (IOException ignored) {}
     }
 }

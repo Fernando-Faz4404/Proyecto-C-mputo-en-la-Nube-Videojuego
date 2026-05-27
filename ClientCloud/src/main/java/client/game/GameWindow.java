@@ -74,11 +74,10 @@ public class GameWindow extends JFrame implements NetworkClient.EventListener {
         this.teamCount = tc;
         this.assignedTeam = "RED"; // will be overridden by server
 
-        // Create network client
-        String serverIp = loadEnvOrDefault("SERVER_IP", "localhost");
-        int serverPort = Integer.parseInt(loadEnvOrDefault("SERVER_PORT", "2555"));
+        // Create network client (WebSocket URL)
+        String serverUrl = loadEnvOrDefault("SERVER_URL", "wss://TU_DOMINIO_AQUI");
 
-        net = new NetworkClient(serverIp, serverPort);
+        net = new NetworkClient(serverUrl);
         net.setListener(this);
 
         // Show lobby immediately

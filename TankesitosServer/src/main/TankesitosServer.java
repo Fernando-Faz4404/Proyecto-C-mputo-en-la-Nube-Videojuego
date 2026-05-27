@@ -1,22 +1,16 @@
 package main;
 
-import java.io.IOException;
-import java.net.ServerSocket;
-
+/**
+ * Punto de entrada del servidor.
+ * Arranca un servidor WebSocket en el puerto 8080.
+ * Ejecutar con: java -jar target/TankesitosServer-1.0.jar
+ */
 public class TankesitosServer {
 
-  
     public static void main(String[] args) {
-        try{
-            //Creamos el socket server 
-            ServerSocket serverSocket = new ServerSocket(2555);
-            Server server = new Server(serverSocket);
-            
-            server.startServer();
-            
-        }catch(IOException e){
-            e.printStackTrace();
-        }
+        WsServer server = new WsServer(8080);
+        server.setReuseAddr(true);
+        server.start();
+        // El servidor corre indefinidamente; la JVM no termina.
     }
-    
 }
