@@ -75,7 +75,7 @@ public class GameWindow extends JFrame implements NetworkClient.EventListener {
         this.assignedTeam = "RED"; // will be overridden by server
 
         // Create network client (WebSocket URL)
-        String serverUrl = loadEnvOrDefault("SERVER_URL", "wss://TU_DOMINIO_AQUI");
+        String serverUrl = loadEnvOrDefault("SERVER_URL", "wss://game.leozamarron.dev");
 
         net = new NetworkClient(serverUrl);
         net.setListener(this);
