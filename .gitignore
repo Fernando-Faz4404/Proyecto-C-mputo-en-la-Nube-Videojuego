@@ -1,0 +1,43 @@
+# --- JAVA & MAVEN ---
+target/
+*.class
+*.log
+*.ctxt
+.mtj.tmp/
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# --- IDEs (IntelliJ, VS Code, NetBeans) ---
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+.vscode/
+.settings/
+.classpath
+.project
+.factorypath
+dist/
+nbdist/
+.nb-gradle/
+**/nbproject/private/
+**/nbproject/build-impl.xml
+**/build
+
+# --- ENVIRONMENT & SECRETS ---
+.env
+.env.*
+!.env.example
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# Archivos compilados de Java
+*.class
