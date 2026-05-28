@@ -1,4 +1,4 @@
-# Proyecto Tankes Unidos
+# Proyecto Tank Wars
 
 Este repositorio contiene un videojuego multijugador de tanques en Java con arquitectura cliente-servidor. El cliente utiliza Swing/AWT para la interfaz gráfica y WebSocket + Gson para comunicación en formato JSON. El servidor está construido con Java-WebSocket y Gson para manejar la sala de espera, la lógica de equipos, las rondas y los eventos de juego.
 
