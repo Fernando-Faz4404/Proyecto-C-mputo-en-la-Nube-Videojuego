@@ -11,7 +11,29 @@ aliases:
 
 # 🎮 Tank Wars — Documentación del Proyecto
 
-Documentación técnica del proyecto **Tank Wars**, un videojuego multijugador de tanques en tiempo real desarrollado en Java para la materia de **Cómputo en la Nube**.
+## Introducción
+
+Tank Wars es un videojuego multijugador en tiempo real desarrollado en Java
+como proyecto para la materia de Cómputo en la Nube.
+
+El proyecto integra distintas tecnologías modernas de infraestructura cloud,
+incluyendo una máquina virtual en Microsoft Azure, Cloudflare Tunnel,
+Nginx y comunicación segura mediante WSS (WebSocket Secure).
+
+El cliente fue desarrollado utilizando Java Swing para la interfaz gráfica, mientras que el servidor administra conexiones concurrentes.
+
+El sistema fue diseñado con énfasis en:
+- Baja latencia.
+- Comunicación persistente.
+- Sincronización en tiempo real.
+
+## Objetivo 
+  
+Diseñar e implementar un videojuego multijugador en tiempo real basado  
+en arquitectura cliente-servidor utilizando tecnologías de cómputo  
+en la nube.
+
+
 
 ---
 

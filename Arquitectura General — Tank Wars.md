@@ -50,6 +50,33 @@ graph TD
 ```
 
 ---
+## Uso de JSON como Protocolo
+
+La comunicación entre cliente y servidor utiliza mensajes JSON
+serializados mediante la librería Gson.
+
+JSON fue elegido debido a:
+- Simplicidad de implementación.
+- Legibilidad.
+- Facilidad de depuración.
+- Compatibilidad multiplataforma.
+- Flexibilidad para extender mensajes futuros.
+
+Cada mensaje contiene un campo `type` que determina el evento
+o acción correspondiente.
+
+### Ejemplo de Mensaje
+
+```json
+{
+  "type": "MOVE",
+  "playerId": "Player247",
+  "team": "RED",
+  "x": 320,
+  "y": 150,
+  "angle": 1.57
+}
+```
 
 ## Capas de la Arquitectura
 
@@ -164,7 +191,29 @@ server {
 
 ---
 
-## Por Qué Esta Arquitectura
+## Por qué esta arquitectura
+
+## ¿Por Qué WebSockets?
+
+El proyecto utiliza WebSockets debido a que los videojuegos multijugador
+en tiempo real requieren comunicación bidireccional persistente y de baja latencia.
+
+A diferencia del modelo tradicional HTTP request/response,
+WebSocket mantiene una conexión abierta entre cliente y servidor,
+permitiendo enviar mensajes en ambas direcciones sin necesidad
+de crear nuevas conexiones constantemente.
+
+### Ventajas 
+
+- Actualización continua de posiciones de jugadores.
+- Sincronización inmediata de disparos y eventos.
+- Menor consumo de recursos de red.
+- Comunicación simultánea cliente-servidor.
+- Mejor experiencia multijugador.
+
+Gracias a WebSockets, el sistema puede mantener múltiples jugadores
+sin necesidad de realizar peticiones HTTP repetitivas constantemente.
+
 
 > [!important] Decisiones de diseño
 > - **Cloudflare Tunnel** → La VM no tiene puerto público expuesto directamente, mejorando la seguridad y evitando ataques DDoS.

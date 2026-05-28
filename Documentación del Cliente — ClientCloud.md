@@ -43,6 +43,27 @@ ClientCloud/
         └── Team.java                 ← Equipos con colores
 ```
 
+
+## Recursos del Cliente
+
+| Carpeta | Contenido |
+|---|---|
+| `resources/maps/` | Mapas del juego en formato texto |
+| `resources/sonidosTank/` | Música y efectos de sonido |
+| `resources/Sprites/` | Sprites de tanques, explosiones y balas |
+| `resources/tiles/` | Texturas del terreno |
+
+### Características Multimedia
+
+El cliente incorpora recursos gráficos y de audio para mejorar
+la experiencia multijugador:
+
+- Música de fondo.
+- Sonidos de disparos.
+- Sonidos de impactos y explosiones.
+- Sprites animados.
+- Mapas renderizados mediante tiles.
+
 ---
 
 ## Navegación entre Pantallas
@@ -75,6 +96,12 @@ String serverUrl = loadEnvOrDefault("SERVER_URL", "wss://game.leozamarron.dev");
 > ```
 
 ### Modo de Prueba (sin servidor)
+
+Este modo fue utilizado durante el desarrollo para probar mecánicas
+de movimiento, colisiones, renderizado y lógica de rondas sin necesidad
+de levantar el servidor WebSocket.
+
+Esto permitió acelerar el proceso de depuración y desarrollo del cliente.
 
 El botón **"▶ MODO PRUEBA"** arranca el juego sin servidor:
 - `net = null`
@@ -190,6 +217,15 @@ flowchart TD
 
 ## `GameMap` — Mapa de Tiles
 
+Los mapas se almacenan como archivos de texto (`.txt`) donde cada número
+representa un tipo de tile específico.
+
+Este enfoque permite:
+- Crear mapas fácilmente.
+- Modificar escenarios sin recompilar código.
+- Reducir complejidad gráfica.
+- Mantener un sistema flexible y escalable.
+
 | Parámetro | Valor |
 |---|---|
 | `TILE_SIZE` | 48 px |
@@ -229,6 +265,19 @@ flowchart TD
 | **R** | Reaparecer (máx 2 por ronda) |
 | **N** | Simular fin de ronda (modo prueba) |
 | **ENTER** | Volver al menú (pantalla de resultados) |
+
+## Sistema de Audio
+
+El cliente implementa un sistema de audio mediante `SoundManager`,
+encargado de reproducir:
+
+- Música de menú.
+- Música de partida.
+- Disparos.
+- Explosiones.
+
+
+El audio mejora la retroalimentación visual y la inmersión del jugador.
 
 ---
 

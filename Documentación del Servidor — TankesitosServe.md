@@ -41,6 +41,66 @@ TankesitosServer/
 
 ---
 
+## Sincronización Cliente-Servidor
+
+Cada cliente:
+- Procesa lógica visual local.
+- Renderiza entidades.
+- Detecta entradas del usuario.
+- Envía eventos importantes al servidor.
+
+El servidor:
+- Valida conexiones.
+- Coordina el lobby.
+- Controla rondas.
+- Sincroniza eventos.
+- Redistribuye información al resto de jugadores.
+
+Este modelo permite mantener consistencia entre todos los clientes
+conectados.
+
+
+
+
+## Concurrencia y manejo multicliente
+
+El servidor fue diseñado para soportar múltiples jugadores conectados
+simultáneamente mediante WebSockets.
+
+Debido a que cada cliente puede enviar mensajes al mismo tiempo,
+fue necesario utilizar estructuras concurrentes para evitar
+condiciones de carrera y corrupción de datos compartidos.
+
+### Estructuras concurrentes utilizadas
+
+| Estructura | Uso |
+|---|---|
+| `ConcurrentHashMap` | Asociación segura entre conexiones WebSocket y jugadores |
+| `CopyOnWriteArrayList` | Lista segura de jugadores conectados |
+| `AtomicInteger` | Manejo thread-safe de puntuaciones |
+| `volatile` | Visibilidad inmediata entre hilos |
+
+### Problemas que resuelve
+
+Sin concurrencia adecuada podrían ocurrir problemas como:
+
+- Sobreescritura de posiciones de jugadores.
+- Inconsistencias en el lobby.
+- Errores en puntuaciones.
+- Desconexiones incorrectas.
+- Corrupción del estado global de la partida.
+
+### Modelo de ejecución
+
+Cada conexión WebSocket es manejada mediante hilos internos de la librería
+`org.java-websocket`, permitiendo que múltiples jugadores interactúen
+con el servidor de manera simultánea.
+
+El servidor centraliza la lógica compartida en `PlayerHandler`,
+el cual actúa como coordinador del estado global de la partida.
+
+
+
 ## Clases Principales
 
 ### `TankesitosServer` — Punto de Entrada
